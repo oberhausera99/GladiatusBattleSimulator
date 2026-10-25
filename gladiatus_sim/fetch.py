@@ -18,6 +18,7 @@ import re
 import time
 import urllib.error
 import urllib.parse
+import threading
 import urllib.request
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
@@ -63,17 +64,21 @@ class Client:
         self.timeout = timeout
         self.debug_dir = debug_dir
         self._cache = {}
-        self._last = 0.0
+        self._next = 0.0
+        self._lock = threading.Lock()
 
     def url(self, country: str, server: str, query: str) -> str:
         root = self.base.format(country=country, server=server)
         return f"{root}/game/index.php?{query}"
 
     def _wait(self) -> None:
-        wait = self.delay - (time.time() - self._last)
-        if wait > 0:
-            time.sleep(wait)
-        self._last = time.time()
+        """Global request spacing, safe to call from several threads."""
+        with self._lock:
+            now = time.time()
+            start = max(now, self._next)
+            self._next = start + self.delay
+        if start > now:
+            time.sleep(start - now)
 
     def request(self, url: str, data: Optional[dict] = None) -> str:
         key = (url, json.dumps(data, sort_keys=True))
@@ -359,15 +364,20 @@ def search_guild(client: Client, country: str, server: str, name: str):
             r'i=(\d+)[^"]*"[^>]*>\s*([^<]+?)\s*</a>', html)
         if found:
             break
+    def norm(t: str) -> str:          # full name or [TAG]: brackets and case do not matter
+        return re.sub(r"[\[\]\s]", "", htmllib.unescape(t)).lower()
+
     for gid, gname in found:
         if gname.strip() == name.strip():
             return gid, gname.strip()
     for gid, gname in found:
-        if gname.strip().lower() == name.strip().lower():
+        if norm(gname) == norm(name):
             return gid, gname.strip()
+    seen = ", ".join(sorted({g.strip() for _, g in found})[:6])
     raise FetchError(
-        f"guild {name!r} not found on s{server}-{country} (give the guild id instead: "
-        "the number after 'i=' in the guild page URL)")
+        f"guild {name!r} not found on s{server}-{country}"
+        + (f" (the search returned: {seen})" if seen else "")
+        + "; give the guild id instead: the number after 'i=' in the guild page URL")
 
 
 def parse_member_list(html: str) -> List[GuildMember]:

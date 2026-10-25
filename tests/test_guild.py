@@ -77,3 +77,20 @@ def test_guild_flow_end_to_end(site):
     text = gl.run_simulation("guild", a, d, 1, seed=1)
     assert "Egyesületi csata" in text and "Párharcok" in text and "ellenfél nélkül" in text
     assert "Összeredmény" in text
+
+
+def test_tag_matching_and_parallel_fetch(site):
+    # the search tolerates brackets and case
+    assert search_guild(site, "en", "1", "red legion")[0] == "10"
+    a, d = gl.fetch_players("guild", ("10", "s1-en"), ("20", "s1-en"), client=site)
+    assert [f.name for f in a.fighters] == ["A1", "A2"]      # member order is kept
+
+
+def test_client_wait_is_thread_safe():
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+    c = Client(base="http://x", delay=0.05)
+    t = time.time()
+    with ThreadPoolExecutor(8) as ex:
+        list(ex.map(lambda _: c._wait(), range(8)))
+    assert time.time() - t >= 0.05 * 7 - 0.01      # requests are spaced even across threads

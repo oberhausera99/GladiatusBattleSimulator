@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 from .arena import simulate_arena
@@ -68,23 +69,33 @@ class GuildSide:
     failed: List[str] = field(default_factory=list)      # members whose page could not be read
 
 
-def fetch_guild_side(name: str, server: str, client: Optional[Client] = None, progress=None) -> GuildSide:
+def fetch_guild_side(name: str, server: str, client: Optional[Client] = None, progress=None,
+                     workers: int = 8) -> GuildSide:
     """Download a guild's member list and every member's arena character."""
     client = client or Client()
     n, country, srv = split_player(name, server)       # same 'name@server' splitting
     gid, gname = search_guild(client, country, srv, n)
     members = fetch_guild_members(client, country, srv, gid)
-    fighters, failed = [], []
-    for i, m in enumerate(members, 1):
-        if progress:
-            progress(f"{gname}: tagok letöltése {i}/{len(members)} ({m.name})")
+    client.delay = min(client.delay, 0.1)           # polite, but several requests in flight
+    done = [0]
+
+    def load(m):
         try:
             f = fetch_arena_fighter_by_id(client, m.pid, country, srv, name=m.name)
             if not f.level and m.level:
                 f.level = m.level
-            fighters.append(f)
+            return f
         except FetchError:
-            failed.append(m.name)
+            return None
+        finally:
+            done[0] += 1
+            if progress:
+                progress(f"{gname}: tagok letöltése {done[0]}/{len(members)}")
+
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        loaded = list(ex.map(load, members))               # keeps the member order
+    fighters = [f for f in loaded if f is not None]
+    failed = [m.name for m, f in zip(members, loaded) if f is None]
     if not fighters:
         raise FetchError(f"{gname}: egyik tag adatlapját sem sikerült beolvasni")
     return GuildSide(gname, gid, fighters, failed)
