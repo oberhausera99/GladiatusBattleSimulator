@@ -32,6 +32,9 @@ class Candidate:
     server: str
     country: str = "en"
 
+    def profile_url(self, client: Client) -> str:
+        return client.url(self.country, self.server, f"mod=player&p={self.pid}")
+
     @property
     def label(self) -> str:
         return f"{self.name}@s{self.server}-{self.country}"
@@ -250,6 +253,7 @@ def load_fighters(client: Client, cands: Sequence[Candidate], progress: Optional
         try:
             f = fetch_arena_fighter_by_id(client, c.pid, c.country, c.server, name=c.label)
             f.level = f.level or c.level
+            f.profile_url = c.profile_url(client)
             return f
         except Exception as e:                       # noqa: BLE001
             failed.append(f"{c.label}: {type(e).__name__}")
@@ -274,6 +278,7 @@ def load_teams(client: Client, cands: Sequence[Candidate], progress: Optional[Ca
         try:
             team = fetch_turma_team_by_id(client, c.pid, c.country, c.server, c.label)
             team[0].level = team[0].level or c.level
+            team[0].profile_url = c.profile_url(client)
             return team
         except Exception as e:                       # noqa: BLE001
             failed.append(f"{c.label}: {type(e).__name__}")

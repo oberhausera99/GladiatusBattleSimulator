@@ -277,6 +277,8 @@ def best_text(b: BestSet, samples: int = 2, seed: Optional[int] = None, progress
              "  #  játékos                       szint  döntő győzelem%  selejtező győzelem%"]
     for i, r in enumerate(top, 1):
         lines.append(f"  {i}  {r.fighter.name[:28]:28s} {r.fighter.level:5d}  {r.final:14.1f}  {r.stage1:18.1f}")
+        if r.fighter.profile_url:
+            lines.append(f"     {r.fighter.profile_url}")
     lines += ["", "Módszer: minden játékos mindenkivel megmérkőzik (selejtező; ha túl sok a játékos, véletlen",
               "ellenfelekkel), a legjobb 16 körmérkőzést játszik (döntő). A győzelem% a mezőnytől függ."]
     if b.server_errors:

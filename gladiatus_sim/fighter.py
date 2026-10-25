@@ -49,7 +49,8 @@ class Fighter:
     critical_healing_chance: float = 0.0
     threat: float = 0.0               # "Veszély" value of the character sheet
     role: str = "dps"                 # "tank" | "dps" | "healer"
-    is_main: bool = False             # the player's own character (not a mercenary)
+    is_main: bool = False
+    profile_url: str = ""             # the player's own character (not a mercenary)
 
     # Arena specific god / pact buffs: minerva, mars, apollo,
     # honour_veteran, honour_destroyer

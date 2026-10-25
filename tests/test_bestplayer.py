@@ -52,6 +52,7 @@ def test_crawl_and_full_flow_on_fake_server():
         b = gl.fetch_best_set(130, 150, "1", client=Client(base=base, delay=0))
         text = gl.best_text(b, samples=2, seed=1)
         assert "Legjobb játékosok" in text and "1  " in text
+        assert "mod=player&p=" in text
     finally:
         srv.shutdown()
 
