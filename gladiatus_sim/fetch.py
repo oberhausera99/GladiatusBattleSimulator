@@ -377,7 +377,9 @@ def search_guild(client: Client, country: str, server: str, name: str):
     raise FetchError(
         f"guild {name!r} not found on s{server}-{country}"
         + (f" (the search returned: {seen})" if seen else "")
-        + "; give the guild id instead: the number after 'i=' in the guild page URL")
+        + ("; the game's guild list shows only the guild tags, so enter the tag (e.g. [TiGeR]) "
+           "or the guild id" if seen else "")
+        + "; the guild id is the number after 'i=' in the guild page URL")
 
 
 def parse_member_list(html: str) -> List[GuildMember]:
