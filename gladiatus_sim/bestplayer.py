@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import html as htmllib
 import json
+import os
 import random
 import re
 import socket
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -337,63 +338,101 @@ def _duel(a, b, rng: random.Random, n: int, life_mode: str, mode: str = "arena")
     return w
 
 
+_W = {}
+
+
+def _init_worker(fs, life_mode, mode):
+    _W["fs"], _W["life"], _W["mode"] = fs, life_mode, mode
+
+
+def _chunk(args):
+    seed, pairs, per = args
+    rng = random.Random(seed)
+    fs = _W["fs"]
+    return [_duel(fs[i], fs[j], rng, per, _W["life"], _W["mode"]) for i, j in pairs]
+
+
+def _play(fs, pairs, per, life_mode, mode, seed, workers, progress=None, label=""):
+    """Wins of the first fighter of every pair (``per`` battles each); spread over processes."""
+    if not pairs:
+        return []
+    cost = 12 if mode == "turma" else 1                    # relative battle cost
+    size = max(1, 4000 // (per * cost))                    # pairs per chunk
+    chunks = [(seed + k, pairs[s:s + size], per) for k, s in enumerate(range(0, len(pairs), size))]
+    out: List[List[float]] = []
+    ex = None
+    if workers > 1 and len(chunks) > 1 and len(pairs) * per * cost > 20000:
+        try:
+            ex = ProcessPoolExecutor(max_workers=workers, initializer=_init_worker,
+                                     initargs=(fs, life_mode, mode))
+            it = ex.map(_chunk, chunks)
+        except Exception:                                  # noqa: BLE001 - no processes: run here
+            ex = None
+    if ex is None:
+        _init_worker(fs, life_mode, mode)
+        it = map(_chunk, chunks)
+    try:
+        for k, r in enumerate(it):
+            out.append(r)
+            if progress and (k % 5 == 0 or k == len(chunks) - 1):
+                progress(f"{label}: {min(len(pairs), (k + 1) * size)}/{len(pairs)} páros")
+    except Exception:                                      # noqa: BLE001 - broken pool: redo serially
+        if ex is None:
+            raise
+        ex.shutdown(cancel_futures=True)
+        ex = None
+        _init_worker(fs, life_mode, mode)
+        out = [_chunk(c) for c in chunks]
+    if ex:
+        ex.shutdown()
+    return [w for r in out for w in r]
+
+
 def tournament(fighters: Sequence, samples: int = 2, finalists: int = 16,
                final_samples: int = 100, seed: Optional[int] = None, life_mode: str = "full",
                top: int = 5, battle_budget: Optional[int] = None, mode: str = "arena",
-               progress: Optional[Callable] = None) -> List[Ranking]:
+               progress: Optional[Callable] = None, workers: Optional[int] = None) -> List[Ranking]:
     """Stage 1: everybody fights everybody (``samples`` battles per pair) as long as that fits into
     ``battle_budget`` battles; with more players each fights a random subset of the others.
     Stage 2: the best ``finalists`` fight a round robin (``final_samples`` per pair).
-    Returns the best ``top`` players."""
+    The battles run on all CPU cores. Returns the best ``top`` players."""
     rng = random.Random(seed)
     if battle_budget is None:
         battle_budget = 150_000 if mode == "turma" else 4_000_000
+    workers = workers if workers is not None else (os.cpu_count() or 1)
     fs = list(fighters)
     n = len(fs)
     if n < 2:
         raise ValueError("at least two players are needed")
+    base = rng.randrange(1 << 30)
     samples = max(1, samples)
     pairs_total = n * (n - 1) // 2
-    per_pair = samples
-    if pairs_total * per_pair > battle_budget:
-        per_pair = 1
+    per_pair = samples if pairs_total * samples <= battle_budget else 1
+    if pairs_total * per_pair <= battle_budget:
+        pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]       # everybody vs everybody
+    else:
+        k = max(1, battle_budget // (n * per_pair))
+        pairs = [(i, j) for i in range(n) for j in rng.sample([x for x in range(n) if x != i], min(k, n - 1))]
     wins = [0.0] * n
     games = [0] * n
-    if pairs_total * per_pair <= battle_budget:
-        plan = ((i, j) for i in range(n) for j in range(i + 1, n))           # everybody vs everybody
-    else:
-        k = max(1, battle_budget // (n * per_pair) // 1)
-
-        def sampled():
-            for i in range(n):
-                for j in rng.sample([x for x in range(n) if x != i], min(k, n - 1)):
-                    yield i, j
-        plan = sampled()
-    last = -1
-    for i, j in plan:
-        w = _duel(fs[i], fs[j], rng, per_pair, life_mode, mode)
+    for (i, j), w in zip(pairs, _play(fs, pairs, per_pair, life_mode, mode, base, workers, progress, "Selejtező")):
         wins[i] += w
         wins[j] += per_pair - w
         games[i] += per_pair
         games[j] += per_pair
-        if progress and i != last and i % 25 == 0:
-            progress(f"Selejtező: {i + 1}/{n}")
-            last = i
     rate1 = [100 * wins[i] / games[i] if games[i] else 0.0 for i in range(n)]
     order = sorted(range(n), key=lambda i: -rate1[i])[:max(2, min(finalists, n))]
     fw = {i: 0.0 for i in order}
     fg = {i: 0 for i in order}
-    for x in range(len(order)):
-        for y in range(x + 1, len(order)):
-            i, j = order[x], order[y]
-            w = _duel(fs[i], fs[j], rng, final_samples, life_mode, mode)
-            fw[i] += w
-            fw[j] += final_samples - w
-            fg[i] += final_samples
-            fg[j] += final_samples
-        if progress:
-            progress(f"Döntő: {x + 1}/{len(order)}")
+    fpairs = [(order[x], order[y]) for x in range(len(order)) for y in range(x + 1, len(order))]
+    for (i, j), w in zip(fpairs, _play(fs, fpairs, final_samples, life_mode, mode, base + 7_000_000,
+                                       workers, progress, "Döntő")):
+        fw[i] += w
+        fw[j] += final_samples - w
+        fg[i] += final_samples
+        fg[j] += final_samples
     ranked = sorted(order, key=lambda i: -fw[i] / fg[i])
+
     def mk(i):
         team = fs[i] if mode == "turma" else None
         return Ranking(team[0] if team else fs[i], rate1[i], 100 * fw[i] / fg[i], games[i] + fg[i], team)
