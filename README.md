@@ -125,11 +125,15 @@ az 50 jelentésen az események összege pontosan megegyezik az összesítő tá
 * Sokkal gyengébb támadók (-140 szint) a főkarakter ellen csak ~60%-ban célozzák.
 
 **Zsoldos-tank (védőre állított zsoldos):** Aveloca csapatában a tank a 373-as szintű utolsó
-Samnit (5. hely). Ugyanolyan statokkal 24,5k sebzést okoz átlagosan, a két másik hasonló
-zsoldos 17,8k-t (+37%). A nyers fegyversebzésre **~7%-os bónusz** (`tank_damage_multiplier`)
-illeszkedik, mert a páncél levonása után ez ~20-35% többlet. Durham csapatában a legtöbbet
-sebző zsoldos (14-es hely) a tank; az aréna-körmérkőzéses tipp (`pick_tank`) ott mást (13-as)
-választott, tehát a "legerősebb zsoldos" nem mindig a tank.
+Samnit (5. hely): ugyanolyan statokkal átlagosan 24,5k sebzést okoz, a két másik hasonló zsoldos
+17,8k-t (+37%). A **mechanizmus nem a megemelt ütésenkénti sebzés**: Durham ellen 1026 normál
+zsoldos-találat közül egy sem lépi túl a bónusz nélküli maximumot (926 <= 934), +7% bónusznál ~100-at
+várnánk. Az ütések száma sem több (166 megfigyelt vs 168 szimulált). A relatív különbséget az
+magyarázza (14 ellenfélnél 0,87 vs 0,85), ha a **tank zsoldos nem a főkarakterre fókuszál**, hanem
+a veszély értékek szerint (főkarakter-szorzó nélkül) választ célpontot: így többet üt a
+gyengébb páncélú ellenséges zsoldosokra, és ugyanaz az ütés ott ~2x annyi sebzést okoz.
+(`tank_targeting="weak"`, ez az alapértelmezés; a `tank_damage_multiplier` 1.0.) Ez nem bizonyított, a
+jelentésekből nem látszik, melyik zsoldos ütött. Ehhez az illesztéshez `main_multiplier=10` tartozik.
 
 **Megerősítés 75 jelentésen, 14 ellenfél-csapattal:** Aveloca tankja a szimulációhoz képest
 1,16-szor annyit sebez, a többi zsoldosa 0,85-ször; a relatív többlet **+37%**, 14 ellenfélből 11-nél

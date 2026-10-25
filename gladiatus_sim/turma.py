@@ -32,9 +32,12 @@ class TurmaRules:
     heal_score_factor: float = 0.5
     # --- target selection ---
     targeting: str = "weighted"        # "weighted" | "uniform"
-    main_multiplier: float = 6.5       # threat multiplier of the player's character (50 jelentésre illesztve: 6-7)
+    main_multiplier: float = 10.0      # threat multiplier of the player's character (fit on 75 reports; depends on tank_targeting)
     tank_multiplier: float = 1.0       # extra multiplier of tank mercenaries
-    tank_damage_multiplier: float = 1.07  # tank merc bonus on raw weapon damage (fit; ~+20-35% after armor)
+    # how the tank merc itself picks targets: "same" (like everybody), "uniform",
+    # "weak" (threat weights without the main character multiplier)
+    tank_targeting: str = "weak"
+    tank_damage_multiplier: float = 1.0   # per-hit damage of the tank merc is NOT raised (see README)
     healers_targetable: bool = True
     # --- hit resolution ---
     # "independent": a blokk a kritikus dobástól függetlenül dönt (a 50 jelentés
@@ -132,10 +135,16 @@ class _Engine:
             return Hit.BLOCKED, max(0.0, base / 2 - absorb)
         return Hit.NORMAL, max(0.0, base - absorb)
 
-    def pick_target(self, rng, s):
+    def pick_target(self, rng, s, i=None):
         opp = self.t[1 - s]
         alive = [j for j, e in enumerate(opp) if self.life[1 - s][j] > 0]
         w = [self.weights[1 - s][j] for j in alive]
+        me = self.t[s][i] if i is not None else None
+        if me is not None and me.role == "tank" and not me.is_main and self.r.tank_targeting != "same":
+            if self.r.tank_targeting == "uniform":
+                w = [1.0] * len(alive)
+            elif self.r.tank_targeting == "weak":
+                w = [max(opp[j].threat, 0.0) for j in alive]
         total = sum(w)
         if total <= 0:
             return rng.choice(alive)
@@ -165,7 +174,7 @@ class _Engine:
                 if f.role == "healer" and self._heal(rng, s, i, st):
                     continue
                 for n in range(2):
-                    j = self.pick_target(rng, s) if n == 0 else j
+                    j = self.pick_target(rng, s, i) if n == 0 else j
                     if n == 1:
                         if rng.random() * 100 >= self.pair[(s, i, j)]["double"]:
                             break
