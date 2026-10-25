@@ -38,8 +38,9 @@ def _banner(name: str) -> str:
             f'rgb({r2},{g2},{b2}) 50%)">{escape(name)}</div>')
 
 
-_EMOJI = {"en": "gb", "uk": "gb", "cs": "cz", "da": "dk", "el": "gr", "sv": "se", "ja": "jp", "ko": "kr",
-          "zh": "cn", "he": "il", "et": "ee", "sl": "si", "nb": "no", "hy": "am", "ar": "sa"}
+# The game's flag classes are ISO *country* codes (ae, ar = Argentina, ...). Only the codes that are
+# not country codes need translating; mapping language codes (ar -> Saudi Arabia ...) was wrong.
+_EMOJI = {"en": "gb", "uk": "gb"}
 
 
 def _flag(info) -> str:

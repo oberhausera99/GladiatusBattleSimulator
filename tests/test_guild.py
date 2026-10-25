@@ -169,3 +169,8 @@ def test_guild_report_flags():
                                  armor=100, damage=(50, 70), flag=flag, flag_url="https://x/f/%s.gif" % flag if flag else "")
     text, html = run_guild(GuildSide("A", "1", [mk("a1", "hu")]), GuildSide("B", "2", [mk("b1", "")]), 1, seed=1)
     assert 'src="https://x/f/hu.gif"' in html and html.count('class="flag"') == 1
+
+
+def test_flag_codes_are_country_codes():
+    from gladiatus_sim.report_html import _flag
+    assert "ar.png" in _flag(("ar", "")) and "gb.png" in _flag(("en", ""))
