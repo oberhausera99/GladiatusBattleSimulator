@@ -6,6 +6,35 @@ Az aréna motor a [DinoDevs/GladiatusBattleSimulator](https://github.com/DinoDev
 (PHP) jól működő arénakódjának portja. A turma motor új: a régi PHP-s turma kód
 több ponton hibás volt, ezeket egy valódi csatajelentés számaival ellenőriztem és javítottam.
 
+## Játékosok lekérdezése név és szerver alapján
+
+A játék nyilvános profiloldalát bejelentkezés nélkül le lehet kérni, ugyanígy dolgozik az
+eredeti [GladiatusPlayerStatsAPI](https://github.com/DinoDevs/GladiatusPlayerStatsAPI)
+is (az innen portolt részeknek a licence LGPL-3.0). A szerver formátuma `s51-en`
+(szerverszám + országkód), a két játékos lehet különböző szerveren.
+
+```bash
+# aréna: a karakter arénás felszerelése (doll=1)
+python -m gladiatus_sim fight arena --attacker "Aveloca@s59-en" --defender=-Durham-@s51-en
+
+# turma: a főkarakter + zsoldosok szerepekkel (doll=2..6)
+python -m gladiatus_sim fight turma --attacker "Aveloca@s59-en" --defender=-Durham-@s51-en --runs 2000
+
+# csak letöltés, JSON-ba (szerkeszthető, majd a `turma` / `arena` parancs bemenete)
+python -m gladiatus_sim show turma "Aveloca@s59-en" > aveloca_turma.json
+```
+
+Ha a név kötőjellel kezdődik, az `=` jeles alakot használd (`--defender=-Durham-@s51-en`).
+A szerepeket (tank, dps, gyógyító, "kimarad") a játék tooltipjéből olvassa ki, a
+szövegek országonként vannak (31 ország).
+
+**Fontos:** a letöltés az oldal HTML-jét reguláris kifejezésekkel olvassa. A
+fejlesztési környezetemből a játék szervere nem érhető el, ezért a lekérdezést
+csak egy mesterséges, a játék oldalainak szerkezetét utánzó teszt-szerverrel
+próbáltam ki (`tests/fake_game.py`), éles játékoldallal nem. Ha egy lekérdezés
+"could not find ... on the page" hibát ad, futtasd `--save-html mappa` kapcsolóval,
+és a mentett oldalak alapján javítható a szerkezet.
+
 ## Használat
 
 ```bash
