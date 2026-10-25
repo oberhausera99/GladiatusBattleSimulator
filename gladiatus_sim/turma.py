@@ -32,11 +32,14 @@ class TurmaRules:
     heal_score_factor: float = 0.5
     # --- target selection ---
     targeting: str = "weighted"        # "weighted" | "uniform"
-    main_multiplier: float = 8.0       # threat multiplier of the player's character
+    main_multiplier: float = 6.5       # threat multiplier of the player's character (50 jelentésre illesztve: 6-7)
     tank_multiplier: float = 1.0       # extra multiplier of tank mercenaries
     healers_targetable: bool = True
     # --- hit resolution ---
-    crit_block_order: str = "crit_first"   # "crit_first" | "block_first"
+    # "independent": a blokk a kritikus dobástól függetlenül dönt (a 50 jelentés
+    # alapján: a találatok ~50%-a blokkolt, kritikussal is, és a blokkolt
+    # kritikus sebzése dmg-absorb). "crit_first" | "block_first": régi PHP-s sorrendek.
+    crit_block_order: str = "independent"
     avoid_critical_cap: float = 25
     crit_cap: float = 50
 
@@ -66,7 +69,8 @@ class TurmaBattle:
 
 
 class _Engine:
-    def __init__(self, teams: Sequence[Sequence[Fighter]], rules: TurmaRules):
+    def __init__(self, teams: Sequence[Sequence[Fighter]], rules: TurmaRules,
+                 pair_overrides: Optional[dict] = None):
         self.t = [list(teams[0]), list(teams[1])]
         self.r = rules
         self.pair = {}      # (side, i, j) -> dict of chances of fighter i vs enemy j
@@ -82,6 +86,10 @@ class _Engine:
                         avoid=e.avoid_chance(rules.avoid_critical_cap),
                         absorb=e.armor_absorb(),
                     )
+        # (side, i, j) -> {hit|double|block|crit|avoid|absorb: value}: e.g. the exact
+        # values read from a battle report's character sheet
+        for key, vals in (pair_overrides or {}).items():
+            self.pair[key].update(vals)
         self.weights = [[self._weight(f) for f in team] for team in self.t]
 
     def _weight(self, f: Fighter) -> float:
@@ -104,6 +112,13 @@ class _Engine:
             return Hit.MISSED, 0.0
         base = rng.randint(int(f.damage[0]), int(f.damage[1]))
         absorb = rng.randint(*c["absorb"])
+        if self.r.crit_block_order == "independent":
+            crit = rng.random() * 100 < c["crit"] and not rng.random() * 100 < c["avoid"]
+            blocked = rng.random() * 100 < c["block"]
+            dmg = max(0.0, (2 * base if crit else base) / (2 if blocked else 1) - absorb)
+            if blocked:
+                return (Hit.AVOIDED_CRITICAL if crit else Hit.BLOCKED), dmg
+            return (Hit.CRITICAL if crit else Hit.NORMAL), dmg
         if self.r.crit_block_order == "block_first" and rng.random() * 100 < c["block"]:
             return Hit.BLOCKED, 0.0
         if rng.random() * 100 < c["crit"]:
@@ -208,8 +223,9 @@ class _Engine:
 
 
 def turma_battle(attackers: Sequence[Fighter], defenders: Sequence[Fighter],
-                 rng: random.Random, rules: Optional[TurmaRules] = None) -> TurmaBattle:
-    return _Engine((attackers, defenders), rules or TurmaRules()).run(rng)
+                 rng: random.Random, rules: Optional[TurmaRules] = None,
+                 pair_overrides: Optional[dict] = None) -> TurmaBattle:
+    return _Engine((attackers, defenders), rules or TurmaRules(), pair_overrides).run(rng)
 
 
 @dataclass
@@ -231,10 +247,11 @@ class TurmaResult:
 
 def simulate_turma(attackers: Sequence[Fighter], defenders: Sequence[Fighter],
                    runs: int = 1000, seed: Optional[int] = None,
-                   rules: Optional[TurmaRules] = None) -> TurmaResult:
+                   rules: Optional[TurmaRules] = None,
+                   pair_overrides: Optional[dict] = None) -> TurmaResult:
     rng = random.Random(seed)
     rules = rules or TurmaRules()
-    eng = _Engine((attackers, defenders), rules)
+    eng = _Engine((attackers, defenders), rules, pair_overrides)
     wins = draws = 0
     pts = [0.0, 0.0]
     deaths = [0.0, 0.0]

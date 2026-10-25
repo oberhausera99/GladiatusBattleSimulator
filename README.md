@@ -81,30 +81,37 @@ A régi PHP turma kód **hibái**: a dupla találatot a karizmák különbségé
 magas szinten szinte mindenki mindig duplázott. A tank 10x-es veszélyszorzója
 ki volt kommentelve, a gyógyítók `threat=0`-val soha nem lehettek célpontok.
 
-## Ami még NEM biztos (kalibrálandó)
+## Eredmények 50 valódi jelentésből (`gladiatus_sim/report_parser.py`)
 
-A `compare` parancs egy valódi jelentéshez hasonlítja a szimulációt. Az egyetlen
-elemzett jelentésnél:
+A `tools/export_reports.js` által letöltött jelentéseket a `report_parser` alakítja
+adattá (harcosok + lapon látott esélymátrixok + eseménysorok + összesítő tábla). Mind
+az 50 jelentésen az események összege pontosan megegyezik az összesítő táblával.
 
-* **Célpontválasztás**: a főkarakter a találatok 76%-át és 84%-át kapta. A
-  szimulátor alapértelmezése a "Veszély" érték szerinti súlyozott húzás, a
-  főkarakter 8-szoros szorzójával (`TurmaRules.main_multiplier`). Ez az eloszlást
-  jól visszaadja (76%, illetve 86%), de egyetlen harcból illesztett hipotézis. A
-  zsoldos-tank szorzója alapból 1, mert ha a főkarakterrel megegyező szorzót kap,
-  a főkarakter aránya 51-69%-ra esik.
-* **Sebzés nagysága**: a szimuláció jelenleg 30-60%-kal több sebzést okoz, mint a
-  valóságos jelentés, ezért a csapatpontok is magasabbak. A találatszámok,
-  a kudarcarányok (elhibázott/blokkolt) egyeznek. Valószínű ok: a kritikus
-  találat és a blokk sorrendje vagy a kritikus elkerülés tényleges valószínűsége.
-  A `crit_block_order` és az `avoid_critical_cap` kapcsolók erre vannak.
-* **Zsoldos védő szerep**: a megfigyelés szerint az egyetlen védőre állított zsoldos
-  többet sebez, mint támadóként. Ezt még nem modellezi a szimulátor.
-* **Halálesetek** hatása a célzásra: az elemzett jelentésben senki sem halt meg.
+**Találat-feloldás (megerősítve ~20 000 ütésen):**
 
-Hogyan lehet tovább pontosítani: több valódi jelentést kell a
-`examples/turma_report_*.json` formátumban rögzíteni (statlap + a jelentés
-összesítő táblája + a szerepkiosztás), majd `compare --rule kulcs=érték`-kel
-ráilleszteni a szabályokat.
+* A **blokk független a kritikustól**: a találatok ~50%-a blokkolt (a lapon 50% a plafon),
+  a kritikusak közül is. A blokkolt normál találat `dmg/2 - páncél` (sokszor 0, "blokkolt"),
+  a blokkolt kritikus `dmg - páncél` (a jelentésben szürke, félkövér `**`).
+* A kritikus elkerülés **külön dobás**: ha sikerül, a kritikus sima találattá válik.
+  Így a kritikus események aránya `crit% * (1 - elkerülés%)`.
+* Ez volt a korábbi 30-60%-os sebzéstöbblet oka: a régi sorrend (kritikus, majd blokk) nem
+  blokkolta a kritikusokat és az elkerült kritikusokat.
+* Az új szabállyal a szimuláció pontszáma a 33 Aveloca-Durham harcra átlag **~2%-on belül**
+  egyezik (118k/115k valós, 120k/116k szimulált), és az egyes harcosok sebzése, gyógyítása is.
+
+**Célpontválasztás (még nem teljesen megfejtett):**
+
+* A főkarakterek (a játékos saját karaktere) a támadások ~80%-át kapják. Az illesztett
+  súlyozás: "Veszély" érték, a főkarakterre ~6,5-szeres szorzóval (`main_multiplier`).
+* A dupla találat mindig **ugyanarra a célpontra** megy.
+* A célzás **időben változik**: a főkarakter saját első ütései az első ~9 körben közel
+  egyenletesen oszlanak el (az ellenfél főkarakterét ~30%-ban célozzák), majd kb. a 10-25.
+  körig 90%-ra nő. A zsoldosok kezdettől 70-85%-ban a főkarakterre mennek.
+  A jelenlegi statikus súlyozás ezt nem adja vissza, de a végeredményre (pontszám) elég jó.
+* Sokkal gyengébb támadók (-140 szint) a főkarakter ellen csak ~60%-ban célozzák.
+
+**Még nyitott:** az időfüggő célzás pontos szabálya, a zsoldos-tank szerepe (a jelentés nem
+tartalmazza a szerepeket), halálesetek hatása (az elemzett jelentésekben nem halt meg senki).
 
 ## Szerkezet
 
@@ -112,6 +119,9 @@ ráilleszteni a szabályokat.
 gladiatus_sim/fighter.py   harcos + közös esélyszámítás
 gladiatus_sim/arena.py     aréna motor
 gladiatus_sim/turma.py     turma motor, TurmaRules
+gladiatus_sim/report_parser.py   mentett turma jelentések (HTML) feldolgozása
+gladiatus_sim/calibrate.py     jelentés -> szimulációs csapatok (pontos lapesélyekkel)
+tools/export_reports.js        jelentések letöltése a böngészőből
 gladiatus_sim/cli.py       parancssor
 examples/                  aréna példa, valódi turma jelentés (statok + megfigyelt eredmények)
 tests/                     képlet- és motorellenőrzések
