@@ -152,7 +152,7 @@ class _Engine:
             main_j = next((j for j in alive if opp[j].is_main), None)
             others = [j for j in alive if j != main_j]
             if main_j is not None:
-                if me.is_main:
+                if me.is_main and me.role == "tank":
                     p = next((pp for until, pp in self.r.main_focus if self.cur_round <= until), self.r.main_focus[-1][1])
                 elif me.role == "tank":
                     wm = max(opp[main_j].threat, 1.0) * self.r.tank_main_mult

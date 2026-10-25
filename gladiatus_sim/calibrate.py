@@ -25,7 +25,10 @@ def _to_fighter(f: ReportFighter, role: str) -> Fighter:
 
 
 def guess_role(f: ReportFighter) -> str:
-    """A jelentés nem tartalmazza a szerepet: a gyógyítás statisztikából következtetünk."""
+    """A jelentés nem tartalmazza a szerepet: a gyógyítás statisztikából következtetünk.
+    A főkarakter szerepe a játékostól tudott adat szerint védő (tank)."""
+    if f.is_player:
+        return "tank"
     return "healer" if f.heal_dealt > 0 else "dps"
 
 
