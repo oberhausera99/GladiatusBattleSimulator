@@ -43,16 +43,25 @@ _EMOJI = {"en": "gb", "uk": "gb", "cs": "cz", "da": "dk", "el": "gr", "sv": "se"
 
 
 def _flag(info) -> str:
-    """Flag of a player: the game's own image when known, else the flag emoji of the code."""
+    """Flag(s) of a player. ``info`` = (codes, image url): the game marks flags with CSS sprite
+    classes only, so the flags come from flagcdn.com, with the flag emoji as offline fallback."""
     if not info:
         return ""
-    code, url = info
-    alt = escape(code.upper())
-    fallback = "".join(chr(0x1F1E6 + ord(c) - 97) for c in _EMOJI.get(code, code)) if len(code) == 2 else ""
-    if url:
-        onerr = f" onerror=\"this.replaceWith(document.createTextNode('{fallback}'))\"" if fallback else ""
-        return f'<img class="flag" src="{escape(url, quote=True)}" alt="{alt}" title="{alt}"{onerr}>'
-    return f'<span class="flag" title="{alt}">{fallback}</span>' if fallback else ""
+    codes, url = info
+    out = []
+    for code in [c for c in codes.split(",") if c]:
+        iso = _EMOJI.get(code, code)
+        alt = escape(code.upper())
+        emoji = "".join(chr(0x1F1E6 + ord(c) - 97) for c in iso) if len(iso) == 2 and iso.isalpha() else ""
+        src = url or (f"https://flagcdn.com/16x12/{iso}.png" if len(iso) == 2 else "")
+        if src:
+            onerr = f" onerror=\"this.replaceWith(document.createTextNode('{emoji}'))\"" if emoji else ""
+            out.append(f'<img class="flag" src="{escape(src, quote=True)}" alt="{alt}" title="{alt}"{onerr}>')
+        elif emoji:
+            out.append(f'<span class="flag" title="{alt}">{emoji}</span>')
+    if not out and url:
+        out.append(f'<img class="flag" src="{escape(url, quote=True)}">')
+    return "".join(out)
 
 
 def guild_report_html(att_name: str, def_name: str, res: GuildBattleResult, extra: str = "",

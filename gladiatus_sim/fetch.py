@@ -295,7 +295,12 @@ _FLAG_CODE = [re.compile(p, re.I) for p in (
 
 def parse_flag(html: str, page_url: str = "") -> Tuple[str, str]:
     """Nationality flag of a player's profile page, next to the 'Nyelv:' label.
-    Returns (two-letter code or '', absolute image URL or '')."""
+    Returns (comma separated codes or '', absolute image URL or ''). The game marks the flags with
+    ``<span class="language-flag ae">`` (a CSS sprite, there is no image URL), usually two of them."""
+    box = re.search(r'class="flag-box"[^>]*>(.*?)</div>', html, re.I | re.S)
+    codes = re.findall(r'language-flag\s+([A-Za-z_]+)', box.group(1) if box else html)
+    if codes:
+        return ",".join(c.lower() for c in codes), ""
     for m in _LANG_LABEL.finditer(html):
         seg = html[m.end(): m.end() + 600]
         end = re.search(r"</tr>|<tr[\s>]", seg, re.I)       # stay within the same table row

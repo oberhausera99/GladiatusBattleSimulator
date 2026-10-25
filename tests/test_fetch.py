@@ -67,3 +67,12 @@ def test_parse_flag_variants():
     c = '<td>Nyelv:</td><td><img src="/img/country/es.png" title="ES"></td>'
     assert parse_flag(c, base)[0] == "es"
     assert parse_flag("<td>Szint:</td><td>5</td>", base) == ("", "")
+
+
+def test_parse_flag_game_markup():
+    from gladiatus_sim.fetch import parse_flag
+    html = ('<div class="flag-box">\n    <b> Nyelv </b>\n    <span class="floatEnd">\n'
+            '            <span class="language-flag ae"></span>\n            <span class="language-flag ae"></span>\n'
+            '        </span>\n</div>')
+    assert parse_flag(html) == ("ae,ae", "")
+    assert parse_flag('<div class="flag-box"><b> Nyelv </b></div><p>x</p>') == ("", "")
