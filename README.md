@@ -141,6 +141,14 @@ látszik. Az ellenfelek csapataiban is mindenhol kiugrik egy zsoldos (átlag 1,7
 Az aréna-körmérkőzéses tank-tipp a csapatok 8/14-ében találta el ezt a zsoldost (az "első helyen
 álló zsoldos" 10/14-ben), ezért a tankot lehetőleg meg kell adni (`roles=`).
 
+**Ismert tankok (játékostól kapott adat, a jelentésekkel egyezik):** a védő zsoldos Klaus, Goofy, AKKILES,
+Maccabi_TelAviv és Aveloca esetében az első (Aveloca: az utolsó, 4.), Durhamnál a harmadik zsoldos. A
+jelentésekben pontosan ezek a zsoldosok sebeznek kiugróan. A szerepet a játék **nem számolja**: a játékos
+állítja be, és a profiloldal tippjéből (`charmercpic dollN`) olvasható ki, ahogy az eredeti szimulátor és a
+`fetch.py` is csinálja. Az "erősebb zsoldos = tank" tipp csak 3/9 esetben egyezett, ezért a `pick_tank`
+csak jelentés-elemzésnél kell, ahol nincs profil. A 6 ismert tankú csapaton a `tank_targeting="weak"`,
+`main_multiplier=10` illeszkedik legjobban (tank 0,93, többi zsoldos 0,89, pontszám 1,02x).
+
 **Még nyitott:** az időfüggő célzás pontos szabálya, a zsoldos-tank szerepe (a jelentés nem
 tartalmazza a szerepeket), halálesetek hatása (az elemzett jelentésekben nem halt meg senki).
 
