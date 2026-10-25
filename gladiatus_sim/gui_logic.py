@@ -13,11 +13,30 @@ from .fetch import (Client, FetchError, fetch_arena_fighter, fetch_arena_fighter
 from .bestplayer import (collect_candidates, discover_servers, load_fighters, load_teams, parse_server_range,
                          tournament)
 from .guild import simulate_guild
+from .i18n import t
 from .fighter import Fighter
 from .turma import TurmaRules, normalize_team, simulate_turma
 
-ROLE_LABELS = {"tank": "tank (védő)", "dps": "támadó", "healer": "gyógyító", "out": "tétlen"}
-ROLE_FROM_LABEL = {v: k for k, v in ROLE_LABELS.items()}
+ROLES = ("tank", "dps", "healer", "out")
+
+
+class _RoleLabels:
+    """Role -> label in the current language."""
+    def __getitem__(self, role: str) -> str:
+        return t("role_" + role)
+
+
+class _RoleFromLabel:
+    """Label (current language) -> role."""
+    def __getitem__(self, label: str) -> str:
+        for r in ROLES:
+            if t("role_" + r) == label:
+                return r
+        raise KeyError(label)
+
+
+ROLE_LABELS = _RoleLabels()
+ROLE_FROM_LABEL = _RoleFromLabel()
 
 
 def cache_dir() -> str:
@@ -52,27 +71,27 @@ def stat_rows(a: Fighter, d: Fighter) -> List[Tuple[str, str, str]]:
         return f"{lo} - {hi}"
 
     rows = [
-        ("Név", a.name, d.name),
-        ("Szint", str(a.level), str(d.level)),
-        ("Életerő (aktuális / max)", _life(a), _life(d)),
-        ("Ügyesség", _fmt(a.skill), _fmt(d.skill)),
-        ("Fürgeség", _fmt(a.agility), _fmt(d.agility)),
-        ("Karizma", _fmt(a.charisma), _fmt(d.charisma)),
-        ("Intelligencia", _fmt(a.intelligence), _fmt(d.intelligence)),
-        ("Páncél", _fmt(a.armor), _fmt(d.armor)),
-        ("Elnyelés / ütés", absorb(a), absorb(d)),
-        ("Sebzés", dmg(a), dmg(d)),
-        ("Találati esély", f"{a.hit_chance_vs(d)} %", f"{d.hit_chance_vs(a)} %"),
-        ("Dupla találat", f"{a.double_hit_chance_vs(d)} %", f"{d.double_hit_chance_vs(a)} %"),
-        ("Kritikus esély", f"{a.crit_chance(50):.0f} %", f"{d.crit_chance(50):.0f} %"),
-        ("Kritikus elkerülés", f"{a.avoid_chance(25):.0f} %", f"{d.avoid_chance(25):.0f} %"),
-        ("Blokk", f"{a.block_chance_vs(d):.0f} %", f"{d.block_chance_vs(a):.0f} %"),
+        (t("s_name"), a.name, d.name),
+        (t("s_level"), str(a.level), str(d.level)),
+        (t("s_life"), _life(a), _life(d)),
+        (t("s_skill"), _fmt(a.skill), _fmt(d.skill)),
+        (t("s_agility"), _fmt(a.agility), _fmt(d.agility)),
+        (t("s_charisma"), _fmt(a.charisma), _fmt(d.charisma)),
+        (t("s_intelligence"), _fmt(a.intelligence), _fmt(d.intelligence)),
+        (t("s_armor"), _fmt(a.armor), _fmt(d.armor)),
+        (t("s_absorb"), absorb(a), absorb(d)),
+        (t("s_damage"), dmg(a), dmg(d)),
+        (t("s_hit"), f"{a.hit_chance_vs(d)} %", f"{d.hit_chance_vs(a)} %"),
+        (t("s_double"), f"{a.double_hit_chance_vs(d)} %", f"{d.double_hit_chance_vs(a)} %"),
+        (t("s_crit"), f"{a.crit_chance(50):.0f} %", f"{d.crit_chance(50):.0f} %"),
+        (t("s_avoid"), f"{a.avoid_chance(25):.0f} %", f"{d.avoid_chance(25):.0f} %"),
+        (t("s_block"), f"{a.block_chance_vs(d):.0f} %", f"{d.block_chance_vs(a):.0f} %"),
     ]
     if a.healing or d.healing:
-        rows.append(("Gyógyítás", _fmt(a.healing), _fmt(d.healing)))
-        rows.append(("Dupla gyógyítás", f"{a.critical_healing_chance:.0f} %", f"{d.critical_healing_chance:.0f} %"))
+        rows.append((t("s_heal"), _fmt(a.healing), _fmt(d.healing)))
+        rows.append((t("s_dheal"), f"{a.critical_healing_chance:.0f} %", f"{d.critical_healing_chance:.0f} %"))
     if a.threat or d.threat:
-        rows.append(("Veszély", _fmt(a.threat), _fmt(d.threat)))
+        rows.append((t("s_threat"), _fmt(a.threat), _fmt(d.threat)))
     return rows
 
 
@@ -119,20 +138,20 @@ def fetch_guild_side(name: str, server: str, client: Optional[Client] = None, pr
         f = load(m)
         done[0] += 1
         if progress:
-            progress(f"{gname}: tagok letöltése {done[0]}/{len(members)}")
+            progress(t("p_members", g=gname, i=done[0], n=len(members)))
         return f
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
         loaded = list(ex.map(load_progress, members))      # keeps the member order
     fighters = [f for f in loaded if f is not None]
     failed = [f"{m.name}: {reasons.get(m.pid, '?')}" for m, f in zip(members, loaded) if f is None]
-    suspicious = [f"{f.name} (L{f.level}, élet {f.life:.0f}, sebzés {f.damage[0]:.0f}-{f.damage[1]:.0f})"
+    suspicious = [t("suspicious", name=f.name, level=f.level, life=f.life, d0=f.damage[0], d1=f.damage[1])
                   for f in fighters
                   if f.life <= 0 or f.damage[1] <= 0 or f.skill <= 0 or f.level <= 0
                   or f.damage[1] < 1.03 * f.damage[0]]
     if not fighters:
-        raise FetchError(f"{gname}: egyik tag adatlapját sem sikerült beolvasni "
-                         f"({failed[0] if failed else 'nincs tag'})")
+        raise FetchError(t("e_no_member_read", g=gname,
+                           why=failed[0] if failed else t("e_no_members")))
     side = GuildSide(gname, gid, fighters, failed, len(members), expected, full_name or "", suspicious)
     return side
 
@@ -166,58 +185,60 @@ def run_simulation(mode: str, a, d, runs: int, rules: Optional[TurmaRules] = Non
         return _guild_text(a, d, runs, seed, life_mode)
     if mode == "arena":
         r = simulate_arena(a, d, runs=runs, seed=seed)
-        return (f"Aréna csata, {r.runs} szimuláció\n"
-                f"  {a.name} nyer: {r.win_chance:.1f} %\n"
-                f"  döntetlen:     {r.draw_chance:.1f} %\n"
-                f"  {d.name} nyer: {r.lose_chance:.1f} %\n"
-                f"  átlagos pontszám: {r.avg_score_attacker:.0f} - {r.avg_score_defender:.0f}\n"
-                f"  átlagos körszám: {r.avg_rounds:.1f}")
+        return "\n".join([t("arena_head", runs=r.runs),
+                          "  " + t("arena_win", n=a.name, p=r.win_chance),
+                          "  " + t("arena_draw", p=r.draw_chance),
+                          "  " + t("arena_win", n=d.name, p=r.lose_chance),
+                          "  " + t("arena_pts", a=r.avg_score_attacker, d=r.avg_score_defender),
+                          "  " + t("arena_rounds", r=r.avg_rounds)])
     ta, td = normalize_team(a), normalize_team(d)
     if not ta or not td:
-        return "Mindkét csapatban legalább egy aktív harcosnak lennie kell."
+        return t("turma_empty")
     r = simulate_turma(ta, td, runs=runs, seed=seed, rules=rules)
-    lines = [f"Circus Turma csata, {r.runs} szimuláció",
-             f"  támadó nyer: {r.win_chance:.1f} %   döntetlen: {r.draw_chance:.1f} %   védő nyer: {r.lose_chance:.1f} %",
-             f"  átlagos pontszám: {r.avg_points[0]:,.0f} - {r.avg_points[1]:,.0f}".replace(",", " "),
-             f"  halálok csatánként: támadó {r.avg_deaths[0]:.2f}, védő {r.avg_deaths[1]:.2f}",
-             "", "  Harcosonként (átlag):"]
-    for label, team, stats in (("Támadó", ta, r.avg_stats[0]), ("Védő", td, r.avg_stats[1])):
+    lines = [t("turma_head", runs=r.runs),
+             "  " + t("turma_chances", w=r.win_chance, d=r.draw_chance, l=r.lose_chance),
+             "  " + t("turma_pts", a=_fmt(r.avg_points[0]), d=_fmt(r.avg_points[1])),
+             "  " + t("turma_deaths", a=r.avg_deaths[0], d=r.avg_deaths[1]),
+             "", "  " + t("turma_per")]
+    for label, team, stats in ((t("attacker"), ta, r.avg_stats[0]), (t("defender"), td, r.avg_stats[1])):
         for f, s in zip(team, stats):
-            lines.append(f"   {label:7s} {f.name[:22]:22s} {ROLE_LABELS[f.role]:12s} "
-                         f"sebzés {s.damage_done:>9,.0f}  gyógyítás {s.heal_done:>8,.0f}".replace(",", " "))
+            lines.append(f"   {label:9s} {f.name[:22]:22s} {ROLE_LABELS[f.role]:14s} "
+                         + t("turma_row", dmg=f"{_fmt(s.damage_done):>9s}", heal=f"{_fmt(s.heal_done):>8s}"))
     return "\n".join(lines)
 
 
 def _guild_text(a: "GuildSide", d: "GuildSide", runs: int, seed: Optional[int], life_mode: str = "current") -> str:
     r = simulate_guild(a.fighters, d.fighters, runs=runs, seed=seed, life_mode=life_mode)
     f = r.first
-    verdict = {"attacker": f"{a.name} nyer", "defender": f"{d.name} nyer", "draw": "döntetlen"}[f.winner]
-    lines = [f"Egyesületi csata: {a.name} (támadó, {len(a.fighters)} tag) vs {d.name} (védő, {len(d.fighters)} tag)",
-             f"Összeredmény: {a.name} {f.points_attacker} - {f.points_defender} {d.name}  =>  {verdict}", ""]
+    verdict = {"attacker": t("g_wins", n=a.name), "defender": t("g_wins", n=d.name), "draw": t("g_draw")}[f.winner]
+    lines = [t("g_head", a=a.name, na=len(a.fighters), d=d.name, nd=len(d.fighters)),
+             t("g_total", a=a.name, pa=f.points_attacker, pd=f.points_defender, d=d.name, v=verdict), ""]
     if r.runs > 1:
-        lines[2:2] = [f"  {r.runs} szimuláció: {a.name} nyer {r.win_chance:.1f} %, döntetlen {r.draw_chance:.1f} %, "
-                      f"{d.name} nyer {r.lose_chance:.1f} %, átlagpont {r.avg_points[0]:.1f} - {r.avg_points[1]:.1f}",
-                      "  (az alábbi párosítás az első szimulált csata)"]
-    lines.append("Párharcok:")
+        lines[2:2] = [t("g_runs", runs=r.runs, a=a.name, w=r.win_chance, dr=r.draw_chance, d=d.name,
+                        l=r.lose_chance, pa=r.avg_points[0], pd=r.avg_points[1]),
+                      t("g_first")]
+    lines.append(t("g_pairs"))
     for p in f.pairs:
         if p.walkover:
             who = p.attacker or p.defender
             side = a.name if p.attacker else d.name
-            lines.append(f"  {who} ({side}) ellenfél nélkül maradt: automatikus győzelem, +{p.points} pont")
+            lines.append(t("g_walkover", who=who, side=side, pts=p.points))
         else:
             win = p.attacker if p.winner == "attacker" else p.defender
-            note = " (döntetlen, a védő nyer)" if p.drawn else ""
-            lines.append(f"  {p.attacker} vs {p.defender}: nyertes {win}{note}, +{p.points} pont "
-                         f"(pontszám {p.score_attacker:.0f} - {p.score_defender:.0f}, {p.rounds} kör)")
-    lines += ["", "Adatbeolvasás:"]
+            note = t("g_drawn") if p.drawn else ""
+            lines.append(t("g_pair", a=p.attacker, d=p.defender, w=win, note=note, pts=p.points,
+                           sa=p.score_attacker, sd=p.score_defender, rounds=p.rounds))
+    lines += ["", t("g_data")]
     for g in (a, d):
-        exp = f" / oldal szerint {g.expected}" if g.expected else ""
+        exp = t("g_exp", n=g.expected) if g.expected else ""
         full = f" [{g.full_name}]" if g.full_name else ""
-        lines.append(f"  {g.name}{full}: életerő: {'teljes' if life_mode == 'full' else 'aktuális'}; lista {g.listed} tag{exp}, beolvasva {len(g.fighters)}, hibás {len(g.failed)}")
+        life = t("g_life_full") if life_mode == "full" else t("g_life_cur")
+        lines.append(t("g_line", g=g.name, full=full, life=life, listed=g.listed, exp=exp,
+                       ok=len(g.fighters), bad=len(g.failed)))
         for x in g.failed[:15]:
-            lines.append(f"    ! nem olvasható: {x}")
+            lines.append(t("g_unreadable", x=x))
         for x in g.suspicious[:15]:
-            lines.append(f"    ? gyanús adat: {x}")
+            lines.append(t("g_suspicious", x=x))
     return "\n".join(lines)
 
 
@@ -225,13 +246,13 @@ def guild_summary(a: "GuildSide", d: "GuildSide") -> str:
     """One status line about how complete the download was."""
     parts = []
     for g in (a, d):
-        t = f"{g.name}: {len(g.fighters)}/{g.listed} tag"
+        x = t("g_members", g=g.name, ok=len(g.fighters), listed=g.listed)
         if g.expected and g.listed < g.expected:
-            t += f" (az oldal szerint {g.expected} tag, a lista csak {g.listed}-et tartalmaz!)"
+            x += t("g_short", exp=g.expected, listed=g.listed)
         if g.failed:
-            t += f", {len(g.failed)} nem olvasható"
-        parts.append(t)
-    return "Statok letöltve. " + " | ".join(parts)
+            x += t("g_failed", n=len(g.failed))
+        parts.append(x)
+    return t("g_summary_head") + " | ".join(parts)
 
 
 @dataclass
@@ -255,35 +276,33 @@ def fetch_best_set(level_min: int, level_max: int, servers_text: str = "",
     servers = parse_server_range(servers_text) if servers_text.strip() else \
         discover_servers(client, country, progress=progress)
     if not servers:
-        raise FetchError("nem találtam szervert (add meg kézzel, pl. 1-60)")
+        raise FetchError(t("e_no_servers"))
     cands, errors = collect_candidates(client, servers, country, level_min, level_max, progress=progress)
     if len(cands) < 2:
-        raise FetchError(f"a {level_min}-{level_max} szinttartományban kevesebb mint 2 játékost találtam "
-                         f"({len(servers)} szerver, {len(errors)} hibás)")
+        raise FetchError(t("e_few_players", lo=level_min, hi=level_max, srv=len(servers), err=len(errors)))
     if mode == "turma":
         fighters, failed = load_teams(client, cands, progress)
     else:
         fighters, failed = load_fighters(client, cands, progress)
     if len(fighters) < 2:
-        raise FetchError("kevesebb mint 2 játékos adatlapját sikerült beolvasni")
+        raise FetchError(t("e_few_pages"))
     return BestSet(fighters, errors, failed, level_min, level_max, len(servers), mode)
 
 
 def best_text(b: BestSet, samples: int = 2, seed: Optional[int] = None, progress=None) -> str:
     top = tournament(b.fighters, samples=samples, seed=seed, progress=progress, mode=b.mode)
     turma = b.mode == "turma"
-    lines = [f"Legjobb játékosok: {b.level_min}-{b.level_max} szint, {b.servers} szerver, {len(b.fighters)} játékos "
-             f"({'turma szabályok szerint, a profilban beállított zsoldosokkal' if turma else 'teljes életerővel, aréna szabályok szerint'})", "",
-             "  #  játékos                       szint  döntő győzelem%  selejtező győzelem%"]
+    how = t("b_how_turma") if turma else t("b_how_arena")
+    lines = [t("b_head", lo=b.level_min, hi=b.level_max, srv=b.servers, n=len(b.fighters), how=how), "",
+             t("b_cols")]
     for i, r in enumerate(top, 1):
         lines.append(f"  {i}  {r.fighter.name[:28]:28s} {r.fighter.level:5d}  {r.final:14.1f}  {r.stage1:18.1f}")
         if r.fighter.profile_url:
             lines.append(f"     {r.fighter.profile_url}")
-    lines += ["", "Módszer: minden játékos mindenkivel megmérkőzik (selejtező; ha túl sok a játékos, véletlen",
-              "ellenfelekkel), a legjobb 16 körmérkőzést játszik (döntő). A győzelem% a mezőnytől függ."]
+    lines += ["", t("b_method1"), t("b_method2")]
     if b.server_errors:
-        lines.append(f"Nem elérhető szerverek ({len(b.server_errors)}): " +
+        lines.append(t("b_servers_down", n=len(b.server_errors)) +
                      ", ".join(f"s{k}" for k in sorted(b.server_errors, key=int)[:20]))
     if b.failed:
-        lines.append(f"Nem olvasható adatlap: {len(b.failed)} játékos")
+        lines.append(t("b_failed", n=len(b.failed)))
     return "\n".join(lines)

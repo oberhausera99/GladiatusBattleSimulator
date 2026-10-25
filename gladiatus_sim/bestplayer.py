@@ -20,6 +20,7 @@ from .arena import arena_battle
 from .fetch import (Client, FetchError, _backup_mode, fetch_arena_fighter_by_id,
                     fetch_turma_team_by_id)
 from .fighter import Fighter
+from .i18n import t
 from .turma import turma_battle
 
 LEVEL_WORDS = re.compile(r"szint|level|stufe|nivel|niveau|livello|poziom|n[ií]vel|seviye|уров|lvl", re.I)
@@ -105,7 +106,7 @@ def discover_servers(client: Client, country: str = "en", max_number: int = 300,
         finally:
             done[0] += 1
             if progress:
-                progress(f"Szerverek keresése: {done[0]}/{len(cands)}")
+                progress(t("p_servers_find", i=done[0], n=len(cands)))
 
     with ThreadPoolExecutor(max_workers=8) as ex:
         for n, ok in zip(cands, ex.map(alive_check, cands)):
@@ -237,7 +238,7 @@ def collect_candidates(client: Client, servers: Sequence[str], country: str, lev
         finally:
             done[0] += 1
             if progress:
-                progress(f"Szerverek bejárása: {done[0]}/{len(servers)}")
+                progress(t("p_servers_crawl", i=done[0], n=len(servers)))
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
         for lst in ex.map(one, servers):
@@ -278,7 +279,7 @@ def load_fighters(client: Client, cands: Sequence[Candidate], progress: Optional
         finally:
             done[0] += 1
             if progress:
-                progress(f"Játékosok letöltése: {done[0]}/{len(cands)}")
+                progress(t("p_players", i=done[0], n=len(cands)))
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
         loaded = list(ex.map(one, interleave(cands)))
@@ -303,7 +304,7 @@ def load_teams(client: Client, cands: Sequence[Candidate], progress: Optional[Ca
         finally:
             done[0] += 1
             if progress:
-                progress(f"Csapatok letöltése: {done[0]}/{len(cands)}")
+                progress(t("p_teams", i=done[0], n=len(cands)))
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
         loaded = list(ex.map(one, interleave(cands)))
@@ -375,7 +376,7 @@ def _play(fs, pairs, per, life_mode, mode, seed, workers, progress=None, label="
         for k, r in enumerate(it):
             out.append(r)
             if progress and (k % 5 == 0 or k == len(chunks) - 1):
-                progress(f"{label}: {min(len(pairs), (k + 1) * size)}/{len(pairs)} páros")
+                progress(t("p_pairs", label=label, i=min(len(pairs), (k + 1) * size), n=len(pairs)))
     except Exception:                                      # noqa: BLE001 - broken pool: redo serially
         if ex is None:
             raise
@@ -415,7 +416,7 @@ def tournament(fighters: Sequence, samples: int = 2, finalists: int = 16,
         pairs = [(i, j) for i in range(n) for j in rng.sample([x for x in range(n) if x != i], min(k, n - 1))]
     wins = [0.0] * n
     games = [0] * n
-    for (i, j), w in zip(pairs, _play(fs, pairs, per_pair, life_mode, mode, base, workers, progress, "Selejtező")):
+    for (i, j), w in zip(pairs, _play(fs, pairs, per_pair, life_mode, mode, base, workers, progress, t("p_stage1"))):
         wins[i] += w
         wins[j] += per_pair - w
         games[i] += per_pair
@@ -426,7 +427,7 @@ def tournament(fighters: Sequence, samples: int = 2, finalists: int = 16,
     fg = {i: 0 for i in order}
     fpairs = [(order[x], order[y]) for x in range(len(order)) for y in range(x + 1, len(order))]
     for (i, j), w in zip(fpairs, _play(fs, fpairs, final_samples, life_mode, mode, base + 7_000_000,
-                                       workers, progress, "Döntő")):
+                                       workers, progress, t("p_final"))):
         fw[i] += w
         fw[j] += final_samples - w
         fg[i] += final_samples
