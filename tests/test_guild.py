@@ -94,3 +94,28 @@ def test_client_wait_is_thread_safe():
     with ThreadPoolExecutor(8) as ex:
         list(ex.map(lambda _: c._wait(), range(8)))
     assert time.time() - t >= 0.05 * 7 - 0.01      # requests are spaced even across threads
+
+
+def test_503_is_retried_and_slows_the_client_down(monkeypatch):
+    import io
+    import urllib.error
+    import urllib.request
+    calls = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    def fake_urlopen(req, timeout=None):
+        calls.append(1)
+        if len(calls) < 3:
+            raise urllib.error.HTTPError(req.full_url, 503, "busy", {"Retry-After": "0"}, None)
+        return Resp(b"<html>ok</html>")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    c = Client(base="http://x", delay=0.01)
+    assert c.request("http://x/a") == "<html>ok</html>"
+    assert len(calls) == 3 and c.delay > 0.01

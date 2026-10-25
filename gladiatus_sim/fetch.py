@@ -71,6 +71,19 @@ class Client:
         root = self.base.format(country=country, server=server)
         return f"{root}/game/index.php?{query}"
 
+    def _back_off(self, attempt: int, retry_after, slow_down: bool = True) -> None:
+        """The game answers 503/429 when it is asked too fast: pause every thread and
+        permanently slow the request rate down a little."""
+        try:
+            pause = float(retry_after)
+        except (TypeError, ValueError):
+            pause = 1.5 * 2 ** attempt
+        pause = min(pause, 30.0)
+        with self._lock:
+            self._next = max(self._next, time.time() + pause)
+            if slow_down:
+                self.delay = min(max(self.delay, 0.1) * 1.5, 2.0)
+
     def _wait(self) -> None:
         """Global request spacing, safe to call from several threads."""
         with self._lock:
@@ -84,14 +97,26 @@ class Client:
         key = (url, json.dumps(data, sort_keys=True))
         if key in self._cache:
             return self._cache[key]
-        self._wait()
         body = urllib.parse.urlencode(data).encode() if data is not None else None
-        req = urllib.request.Request(url, data=body, headers={"User-Agent": USER_AGENT})
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
-                text = r.read().decode("utf-8", errors="replace")
-        except (urllib.error.URLError, OSError) as e:
-            raise FetchError(f"request failed for {url}: {e}") from e
+        text = None
+        last: Optional[Exception] = None
+        for attempt in range(6):
+            self._wait()
+            req = urllib.request.Request(url, data=body, headers={"User-Agent": USER_AGENT})
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                    text = r.read().decode("utf-8", errors="replace")
+                break
+            except urllib.error.HTTPError as e:
+                last = e
+                if e.code not in (429, 500, 502, 503, 504):
+                    break
+                self._back_off(attempt, e.headers.get("Retry-After") if e.headers else None)
+            except (urllib.error.URLError, OSError) as e:
+                last = e
+                self._back_off(attempt, None, slow_down=False)
+        if text is None:
+            raise FetchError(f"request failed for {url}: {last}") from last
         if self.debug_dir:
             os.makedirs(self.debug_dir, exist_ok=True)
             name = re.sub(r"[^A-Za-z0-9]+", "_", url.split("?", 1)[-1])[:80]

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
@@ -74,14 +75,14 @@ class GuildSide:
 
 
 def fetch_guild_side(name: str, server: str, client: Optional[Client] = None, progress=None,
-                     workers: int = 8) -> GuildSide:
+                     workers: int = 4) -> GuildSide:
     """Download a guild's member list and every member's arena character."""
     client = client or Client()
     n, country, srv = split_player(name, server)       # same 'name@server' splitting
     gid, gname = search_guild(client, country, srv, n)
     members = fetch_guild_members(client, country, srv, gid)
     full_name, expected = fetch_guild_info(client, country, srv, gid)
-    client.delay = min(client.delay, 0.1)           # polite, but several requests in flight
+    client.delay = max(client.delay, 0.25)          # the game answers 503 when asked too fast
     done = [0]
     reasons = {}
 
