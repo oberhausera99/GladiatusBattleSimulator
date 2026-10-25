@@ -39,3 +39,4 @@ def test_two_tank_mercs_become_idle():
                                           intelligence=50, armor=100, damage=(10, 20), role=role, is_main=main)
     team = normalize_team([mk("tank", True), mk("tank"), mk("tank"), mk("dps"), mk("out")])
     assert [f.role for f in team] == ["tank", "dps"] and team[0].is_main
+

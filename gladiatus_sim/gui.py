@@ -241,7 +241,9 @@ class App(ttk.Frame):
 
     def _members(self, side):
         t = self.team_a if side == "a" else self.team_d
-        if self.mode in ("guild", "best"):
+        if self.mode == "best":       # in turma measurement each entry is a team: show its main character
+            return [x[0] if isinstance(x, list) else x for x in t.fighters]
+        if self.mode == "guild":
             return t.fighters
         return t if self.mode == "turma" else [t]
 
