@@ -37,10 +37,18 @@ class App(ttk.Frame):
         self.v_mode = tk.StringVar(value="turma")
         ttk.Radiobutton(f, text="Circus Turma (5v5)", variable=self.v_mode, value="turma").grid(row=0, column=0, sticky="w")
         ttk.Radiobutton(f, text="Aréna (1v1)", variable=self.v_mode, value="arena").grid(row=1, column=0, sticky="w")
+        ttk.Radiobutton(f, text="Egyesületi csata", variable=self.v_mode, value="guild",
+                        command=self._mode_changed).grid(row=2, column=0, sticky="w")
+        for rb in f.grid_slaves(column=0):
+            if isinstance(rb, ttk.Radiobutton) and rb.cget("value") != "guild":
+                rb.configure(command=self._mode_changed)
         self.v_att, self.v_att_srv = tk.StringVar(), tk.StringVar(value="s51-en")
         self.v_def, self.v_def_srv = tk.StringVar(), tk.StringVar(value="s51-en")
+        self.lbl_names = []
         for r, (lab, vn, vs) in enumerate((("Támadó", self.v_att, self.v_att_srv), ("Védő", self.v_def, self.v_def_srv))):
-            ttk.Label(f, text=f"{lab} neve:").grid(row=r, column=1, padx=(14, 2), sticky="e")
+            lbl = ttk.Label(f, text=f"{lab} neve:")
+            lbl.grid(row=r, column=1, padx=(14, 2), sticky="e")
+            self.lbl_names.append((lbl, lab))
             ttk.Entry(f, textvariable=vn, width=22).grid(row=r, column=2)
             ttk.Label(f, text="szerver:").grid(row=r, column=3, padx=(8, 2), sticky="e")
             ttk.Entry(f, textvariable=vs, width=9).grid(row=r, column=4)
@@ -51,6 +59,12 @@ class App(ttk.Frame):
         self.btn_get.grid(row=1, column=5, columnspan=2, sticky="ew", padx=(14, 0))
         self.v_status = tk.StringVar(value="Add meg a két játékost, majd kattints a Get stats gombra.")
         ttk.Label(self, textvariable=self.v_status, foreground="#555").grid(row=1, column=0, sticky="w", pady=(4, 4))
+
+    def _mode_changed(self):
+        guild = self.v_mode.get() == "guild"
+        for lbl, lab in self.lbl_names:
+            lbl.configure(text=f"{lab} egyesület teljes neve (vagy azonosítója):" if guild else f"{lab} neve:")
+        self.v_runs.set("1" if guild else ("10000" if self.v_mode.get() == "arena" else "1000"))
 
     # ---- stats area ----------------------------------------------------
     def _build_stats(self):
@@ -123,7 +137,12 @@ class App(ttk.Frame):
             self.v_status.set("Mindkét játékos nevét add meg.")
             return
         self._busy(True, "Statok letöltése...")
-        self._run_thread(lambda: gl.fetch_players(mode, att, dfd), lambda r, e: self._got_stats(mode, r, e))
+
+        def progress(msg):
+            self.q.put((lambda r, e, m=msg: self.v_status.set(m), None, None))
+
+        self._run_thread(lambda: gl.fetch_players(mode, att, dfd, progress=progress),
+                         lambda r, e: self._got_stats(mode, r, e))
 
     def _got_stats(self, mode, res, err):
         if err is not None:
@@ -141,6 +160,7 @@ class App(ttk.Frame):
                 lb.insert("end", self._label(f))
             lb.selection_set(0)
             self.lists[side][2].configure(state="readonly" if mode == "turma" else "disabled")
+            self.lists[side][0].configure(height=14 if mode == "guild" else 6)
         self._on_select_sync()
         self._refresh_table()
         self._busy(False, "Statok letöltve. Állítsd be a szerepeket, majd kattints a Simulate battle gombra."
@@ -148,10 +168,13 @@ class App(ttk.Frame):
 
     def _members(self, side):
         t = self.team_a if side == "a" else self.team_d
+        if self.mode == "guild":
+            return t.fighters
         return t if self.mode == "turma" else [t]
 
-    @staticmethod
-    def _label(f):
+    def _label(self, f):
+        if self.mode == "guild":
+            return f"{f.name[:20]:20s} L{f.level}"
         star = "★ " if f.is_main else "   "
         return f"{star}{f.name.split('@')[0][:16]:16s} L{f.level} [{gl.ROLE_LABELS[f.role]}]"
 
@@ -183,6 +206,8 @@ class App(ttk.Frame):
         for row in self.table.get_children():
             self.table.delete(row)
         for lab, va, vd in gl.stat_rows(a, d):
+            if self.mode != "turma" and lab in ("Gyógyítás", "Dupla gyógyítás", "Veszély"):
+                continue
             self.table.insert("", "end", values=(va, lab, vd))
         if self.mode == "turma":
             self.table.insert("", "end", values=(gl.ROLE_LABELS[a.role], "Szerep", gl.ROLE_LABELS[d.role]))

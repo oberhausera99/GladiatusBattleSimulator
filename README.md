@@ -46,7 +46,17 @@ Add meg a támadó és a védő nevét + szerverét (pl. `s51-en`), a szimuláci
 karaktere), a középső táblázat mindig a kiválasztott két harcos statjait mutatja egymással
 szemben (az esélyek egymás ellen értendők). A kiválasztott harcos **szerepe** (tank, támadó,
 gyógyító, tétlen) átállítható. Két vagy több tankra állított zsoldos a játék szabálya szerint
-tétlen lesz. A **Simulate battle** gomb lefuttatja a szimulációt és kiírja az eredményt.
+tétlen lesz. **Egyesületi csata** (harmadik mód): add meg a két egyesület **teljes nevét** (vagy az azonosítóját: az
+egyesületi oldal URL-jében az `i=` szám, pl. 2562) és a szervert. A Get stats letölti a tagok listáját
+(`mod=guild&submod=memberList&i=ID`) és minden tag aréna-karakterét; a listában a névre kattintva a tag
+statjai látszanak. Szabályok: a tagokat véletlenszerűen párosítja, a párok aréna csatát vívnak; ha az
+egyik egyesületben több tag van, a felesleg ellenfél nélkül automatikusan nyer (+1 pont); csatagyőzelem
++2 pont; döntetlen esetén a védő egyesület tagja nyer (+2). Több pontot szerző egyesület a győztes. Az
+eredmény: összpontszám + minden párharc (ki kivel, ki nyert). A minta alapértelmezése 1 csata. Az
+egyesületi keresés a játék kereső oldalán nem volt ellenőrizhető, ha nem találja a nevet, add meg az
+azonosítót. A csatákhoz a tagok teljes életerejével számol (`life_mode="full"`).
+
+A **Simulate battle** gomb lefuttatja a szimulációt és kiírja az eredményt.
 Linuxon a `python3-tk` csomag kell hozzá.
 
 ## Használat

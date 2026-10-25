@@ -310,3 +310,102 @@ def fighter_to_dict(f: Fighter) -> dict:
     if f.buffs:
         d["buffs"] = sorted(f.buffs)
     return {k: v for k, v in d.items() if v is not None}
+
+
+# ------------------------------------------------------------------- guilds
+EMPTY_SH = "d41d8cd98f00b204e9800998ecf8427e"      # md5("") - the public, not logged in token
+
+
+@dataclass
+class GuildMember:
+    pid: str
+    name: str
+    rank: str = ""
+    level: int = 0
+
+
+def parse_guild_ref(text: str) -> Optional[str]:
+    """A guild id given directly: '2562' or a URL containing '...&i=2562'. Else None."""
+    t = text.strip()
+    if re.fullmatch(r"\d+", t):
+        return t
+    m = re.search(r"[?&]i=(\d+)", t)
+    return m.group(1) if m else None
+
+
+def search_guild(client: Client, country: str, server: str, name: str):
+    """Find a guild id by its full name through the highscore search. Returns (id, name).
+
+    The game's guild search markup could not be checked from the build environment, so
+    several request shapes are tried; if none works the caller should enter the guild id
+    (the ``i=`` value of the guild page URL) instead of the name.
+    """
+    gid = parse_guild_ref(name)
+    if gid:
+        return gid, name.strip()
+    attempts = [
+        ("mod=highscore&submod=suche&t=1", {"s": "s", "xs": name, "t": "1"}),
+        ("mod=highscore&submod=suche", {"s": "s", "xs": name, "t": "1"}),
+        ("mod=highscore&t=1", {"s": "s", "xs": name}),
+        ("mod=highscore&submod=suche", {"s": "s", "xs": name}),
+    ]
+    found: List[Tuple[str, str]] = []
+    for query, data in attempts:
+        html = client.request(client.url(country, server, query), data=data)
+        if _backup_mode(html):
+            raise FetchError(f"s{server}-{country}: the server is in backup mode")
+        found = re.findall(
+            r'<a\s+[^>]*href="index\.php\?mod=guild&(?:amp;)?(?:submod=\w+&(?:amp;)?)?'
+            r'i=(\d+)[^"]*"[^>]*>\s*([^<]+?)\s*</a>', html)
+        if found:
+            break
+    for gid, gname in found:
+        if gname.strip() == name.strip():
+            return gid, gname.strip()
+    for gid, gname in found:
+        if gname.strip().lower() == name.strip().lower():
+            return gid, gname.strip()
+    raise FetchError(
+        f"guild {name!r} not found on s{server}-{country} (give the guild id instead: "
+        "the number after 'i=' in the guild page URL)")
+
+
+def parse_member_list(html: str) -> List[GuildMember]:
+    rows = re.findall(
+        r'<tr>\s*<td>\s*<a\s+href="index\.php\?mod=player&(?:amp;)?p=(\d+)[^"]*">\s*([^<]+?)\s*</a>'
+        r'\s*</td>\s*<td>\s*([^<]*?)\s*</td>\s*<td>\s*(\d+)\s*</td>', html)
+    members = [GuildMember(pid, htmllib.unescape(name), htmllib.unescape(rank), int(level))
+               for pid, name, rank, level in rows]
+    if not members:      # layout fallback: only the player links
+        seen = set()
+        for pid, name in re.findall(
+                r'<a\s+href="index\.php\?mod=player&(?:amp;)?p=(\d+)[^"]*">\s*([^<]+?)\s*</a>', html):
+            if pid not in seen:
+                seen.add(pid)
+                members.append(GuildMember(pid, htmllib.unescape(name)))
+    return members
+
+
+def fetch_guild_members(client: Client, country: str, server: str, gid: str) -> List[GuildMember]:
+    html = client.request(client.url(
+        country, server, f"mod=guild&submod=memberList&i={gid}&sh={EMPTY_SH}"))
+    if _backup_mode(html):
+        raise FetchError(f"s{server}-{country}: the server is in backup mode")
+    members = parse_member_list(html)
+    if not members:
+        raise FetchError(f"no members found on the member list of guild {gid} "
+                         "(the guild does not exist or its member list is not public)")
+    return members
+
+
+def fetch_arena_fighter_by_id(client: Client, pid: str, country: str, server: str,
+                              name: str = "") -> Fighter:
+    html = client.request(client.url(country, server, f"mod=player&p={pid}"))
+    raw = parse_character_page(html)
+    f = to_fighter(raw, use_current_life=True)
+    f.name = name or raw.name
+    if len(raw.percents) >= 4 and \
+            raw.percents[2] - php_round(raw.crit_points * 52 / max(2, raw.level - 8) / 5) == 10:
+        f.buffs = frozenset({"honour_veteran"})
+        f.critical_chance = None
+    return f

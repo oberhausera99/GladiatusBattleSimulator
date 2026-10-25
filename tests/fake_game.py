@@ -53,6 +53,8 @@ def make_character(name, role_map=None, **kw):
 class Handler(BaseHTTPRequestHandler):
     players = {}      # id -> {doll -> character}
     names = {}        # name -> id
+    guilds = {}       # guild name -> id
+    members = {}      # guild id -> [(player id, name, rank, level)]
 
     def log_message(self, *a):
         pass
@@ -71,18 +73,28 @@ class Handler(BaseHTTPRequestHandler):
         q = form.get("xs", [""])[0]
         rows = "".join(f'<a href="index.php?mod=player&p={pid}" target="_self">{nm}</a>'
                        for nm, pid in self.names.items() if q.lower() in nm.lower())
+        rows += "".join(f'<a href="index.php?mod=guild&submod=forumGladiatorius&i={gid}">{nm}</a>'
+                        for nm, gid in self.guilds.items() if q.lower() in nm.lower())
         self._send("<html>" + PAD + rows + PAD + "</html>")
 
     def do_GET(self):
         q = parse_qs(urlparse(self.path).query)
+        if q.get("submod", [""])[0] == "memberList":
+            rows = "".join(
+                f'<tr><td><a href="index.php?mod=player&p={pid}&sh=x">{nm}</a></td><td>{rk}</td><td>{lv}</td>'
+                '<td align="right"></td></tr>'
+                for pid, nm, rk, lv in self.members.get(q.get("i", [""])[0], []))
+            self._send("<html>" + PAD + "<table>" + rows + "</table>" + PAD + "</html>")
+            return
         pid = q.get("p", [""])[0]
         doll = int(q.get("doll", ["1"])[0])
         ch = self.players.get(pid, {}).get(doll)
         self._send(page(ch) if ch else "<html>" + PAD + "nothing</html>")
 
 
-def start(players, names):
+def start(players, names, guilds=None, members=None):
     Handler.players, Handler.names = players, names
+    Handler.guilds, Handler.members = guilds or {}, members or {}
     srv = HTTPServer(("127.0.0.1", 0), Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, f"http://127.0.0.1:{srv.server_port}"

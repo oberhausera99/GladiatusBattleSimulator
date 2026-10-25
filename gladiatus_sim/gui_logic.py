@@ -3,8 +3,12 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
+from dataclasses import dataclass, field
+
 from .arena import simulate_arena
-from .fetch import Client, fetch_arena_fighter, fetch_turma_team, parse_player_spec
+from .fetch import (Client, FetchError, fetch_arena_fighter, fetch_arena_fighter_by_id,
+                    fetch_guild_members, fetch_turma_team, parse_player_spec, search_guild)
+from .guild import simulate_guild
 from .fighter import Fighter
 from .turma import TurmaRules, normalize_team, simulate_turma
 
@@ -56,10 +60,44 @@ def stat_rows(a: Fighter, d: Fighter) -> List[Tuple[str, str, str]]:
     return rows
 
 
-def fetch_players(mode: str, att: Tuple[str, str], dfd: Tuple[str, str], client: Optional[Client] = None):
+@dataclass
+class GuildSide:
+    name: str
+    gid: str
+    fighters: List[Fighter]
+    failed: List[str] = field(default_factory=list)      # members whose page could not be read
+
+
+def fetch_guild_side(name: str, server: str, client: Optional[Client] = None, progress=None) -> GuildSide:
+    """Download a guild's member list and every member's arena character."""
+    client = client or Client()
+    n, country, srv = split_player(name, server)       # same 'name@server' splitting
+    gid, gname = search_guild(client, country, srv, n)
+    members = fetch_guild_members(client, country, srv, gid)
+    fighters, failed = [], []
+    for i, m in enumerate(members, 1):
+        if progress:
+            progress(f"{gname}: tagok letöltése {i}/{len(members)} ({m.name})")
+        try:
+            f = fetch_arena_fighter_by_id(client, m.pid, country, srv, name=m.name)
+            if not f.level and m.level:
+                f.level = m.level
+            fighters.append(f)
+        except FetchError:
+            failed.append(m.name)
+    if not fighters:
+        raise FetchError(f"{gname}: egyik tag adatlapját sem sikerült beolvasni")
+    return GuildSide(gname, gid, fighters, failed)
+
+
+def fetch_players(mode: str, att: Tuple[str, str], dfd: Tuple[str, str],
+                  client: Optional[Client] = None, progress=None):
     """Download both players. `att`/`dfd` are (name, server). Returns (a, d):
     single Fighters in arena mode, lists (idle mercs included) in turma mode."""
     client = client or Client()
+    if mode == "guild":
+        return (fetch_guild_side(att[0], att[1], client, progress),
+                fetch_guild_side(dfd[0], dfd[1], client, progress))
     out = []
     for name, server in (att, dfd):
         n, country, srv = split_player(name, server)
@@ -73,6 +111,8 @@ def fetch_players(mode: str, att: Tuple[str, str], dfd: Tuple[str, str], client:
 def run_simulation(mode: str, a, d, runs: int, rules: Optional[TurmaRules] = None,
                    seed: Optional[int] = None) -> str:
     """Run the simulation and return the human readable result text."""
+    if mode == "guild":
+        return _guild_text(a, d, runs, seed)
     if mode == "arena":
         r = simulate_arena(a, d, runs=runs, seed=seed)
         return (f"Aréna csata, {r.runs} szimuláció\n"
@@ -94,4 +134,30 @@ def run_simulation(mode: str, a, d, runs: int, rules: Optional[TurmaRules] = Non
         for f, s in zip(team, stats):
             lines.append(f"   {label:7s} {f.name[:22]:22s} {ROLE_LABELS[f.role]:12s} "
                          f"sebzés {s.damage_done:>9,.0f}  gyógyítás {s.heal_done:>8,.0f}".replace(",", " "))
+    return "\n".join(lines)
+
+
+def _guild_text(a: "GuildSide", d: "GuildSide", runs: int, seed: Optional[int]) -> str:
+    r = simulate_guild(a.fighters, d.fighters, runs=runs, seed=seed)
+    f = r.first
+    verdict = {"attacker": f"{a.name} nyer", "defender": f"{d.name} nyer", "draw": "döntetlen"}[f.winner]
+    lines = [f"Egyesületi csata: {a.name} (támadó, {len(a.fighters)} tag) vs {d.name} (védő, {len(d.fighters)} tag)",
+             f"Összeredmény: {a.name} {f.points_attacker} - {f.points_defender} {d.name}  =>  {verdict}", ""]
+    if r.runs > 1:
+        lines[2:2] = [f"  {r.runs} szimuláció: {a.name} nyer {r.win_chance:.1f} %, döntetlen {r.draw_chance:.1f} %, "
+                      f"{d.name} nyer {r.lose_chance:.1f} %, átlagpont {r.avg_points[0]:.1f} - {r.avg_points[1]:.1f}",
+                      "  (az alábbi párosítás az első szimulált csata)"]
+    lines.append("Párharcok:")
+    for p in f.pairs:
+        if p.walkover:
+            who = p.attacker or p.defender
+            side = a.name if p.attacker else d.name
+            lines.append(f"  {who} ({side}) ellenfél nélkül maradt: automatikus győzelem, +{p.points} pont")
+        else:
+            win = p.attacker if p.winner == "attacker" else p.defender
+            note = " (döntetlen, a védő nyer)" if p.drawn else ""
+            lines.append(f"  {p.attacker} vs {p.defender}: nyertes {win}{note}, +{p.points} pont "
+                         f"(pontszám {p.score_attacker:.0f} - {p.score_defender:.0f}, {p.rounds} kör)")
+    if a.failed or d.failed:
+        lines += ["", f"Nem sikerült beolvasni (kihagyva): {', '.join(a.failed + d.failed)}"]
     return "\n".join(lines)
