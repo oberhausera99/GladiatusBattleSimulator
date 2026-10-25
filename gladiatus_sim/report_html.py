@@ -25,6 +25,7 @@ tr:nth-child(even) td{background:#e6d2a3}
 .thumb{width:22px;text-align:center}
 .name{text-decoration:underline;color:#1d4b8f;font-weight:bold}
 .tot td{font-weight:bold;border-top:2px solid #8a6a3a;background:#e0c993}
+.flag{height:12px;vertical-align:middle;margin:0 2px}
 .note{margin-top:8px;font-size:11px;color:#5a4020}
 """
 
@@ -37,15 +38,37 @@ def _banner(name: str) -> str:
             f'rgb({r2},{g2},{b2}) 50%)">{escape(name)}</div>')
 
 
-def guild_report_html(att_name: str, def_name: str, res: GuildBattleResult, extra: str = "") -> str:
+_EMOJI = {"en": "gb", "uk": "gb", "cs": "cz", "da": "dk", "el": "gr", "sv": "se", "ja": "jp", "ko": "kr",
+          "zh": "cn", "he": "il", "et": "ee", "sl": "si", "nb": "no", "hy": "am", "ar": "sa"}
+
+
+def _flag(info) -> str:
+    """Flag of a player: the game's own image when known, else the flag emoji of the code."""
+    if not info:
+        return ""
+    code, url = info
+    alt = escape(code.upper())
+    fallback = "".join(chr(0x1F1E6 + ord(c) - 97) for c in _EMOJI.get(code, code)) if len(code) == 2 else ""
+    if url:
+        onerr = f" onerror=\"this.replaceWith(document.createTextNode('{fallback}'))\"" if fallback else ""
+        return f'<img class="flag" src="{escape(url, quote=True)}" alt="{alt}" title="{alt}"{onerr}>'
+    return f'<span class="flag" title="{alt}">{fallback}</span>' if fallback else ""
+
+
+def guild_report_html(att_name: str, def_name: str, res: GuildBattleResult, extra: str = "",
+                      att_flags=None, def_flags=None) -> str:
+    """``att_flags`` / ``def_flags``: {member name: (code, image url)}."""
+    att_flags, def_flags = att_flags or {}, def_flags or {}
     win = {"attacker": att_name, "defender": def_name}.get(res.winner)
     verdict = t("r_won", n=escape(win)) if win else t("r_draw")
     rows = []
     thumb = "&#128077;"
     for p in res.pairs:
         att_won = p.winner == "attacker"
-        la = f'<span class="name">{escape(p.attacker)}</span>' if p.attacker else ""
-        ld = f'<span class="name">{escape(p.defender)}</span>' if p.defender else ""
+        la = (f'<span class="name">{escape(p.attacker)}</span> {_flag(att_flags.get(p.attacker))}'
+              if p.attacker else "")
+        ld = (f'{_flag(def_flags.get(p.defender))} <span class="name">{escape(p.defender)}</span>'
+              if p.defender else "")
         rows.append(
             f'<tr><td class="thumb">{thumb if att_won and p.attacker else ""}</td>'
             f'<td class="l">{la}</td><td class="n">{p.score_attacker:.0f}</td>'

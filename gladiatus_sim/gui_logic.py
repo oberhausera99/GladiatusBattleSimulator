@@ -216,7 +216,10 @@ def run_guild(a: "GuildSide", d: "GuildSide", runs: int, seed: Optional[int] = N
     if r.runs > 1:
         extra = t("g_runs", runs=r.runs, a=a.name, w=r.win_chance, dr=r.draw_chance, d=d.name,
                   l=r.lose_chance, pa=r.avg_points[0], pd=r.avg_points[1]).strip()
-    return _guild_text(a, d, r, life_mode), guild_report_html(a.name, d.name, r.first, extra)
+    return _guild_text(a, d, r, life_mode), guild_report_html(
+        a.name, d.name, r.first, extra,
+        {f.name: (f.flag, f.flag_url) for f in a.fighters if f.flag or f.flag_url},
+        {f.name: (f.flag, f.flag_url) for f in d.fighters if f.flag or f.flag_url})
 
 
 def _guild_text(a: "GuildSide", d: "GuildSide", r, life_mode: str = "current") -> str:

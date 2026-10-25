@@ -55,3 +55,15 @@ def test_unknown_player_is_a_clean_error(site):
 def test_case_insensitive_name_fallback(site):
     f = fetch_arena_fighter(site, "hero", "en", "1")
     assert f.name.startswith("Hero")
+
+
+def test_parse_flag_variants():
+    from gladiatus_sim.fetch import parse_flag
+    base = "https://s1-hu.gladiatus.gameforge.com/game/index.php?mod=player&p=5"
+    a = '<tr><td>Nyelv:</td><td><img src="//lang.gameforge.com/flags/hu.gif" alt=""></td></tr>'
+    assert parse_flag(a, base) == ("hu", "https://lang.gameforge.com/flags/hu.gif")
+    b = '<tr><th>Language:</th><td><span class="flag flag_de" title="Deutsch"></span></td></tr><tr><td><img src="x/fr.png">'
+    assert parse_flag(b, base) == ("de", "")
+    c = '<td>Nyelv:</td><td><img src="/img/country/es.png" title="ES"></td>'
+    assert parse_flag(c, base)[0] == "es"
+    assert parse_flag("<td>Szint:</td><td>5</td>", base) == ("", "")

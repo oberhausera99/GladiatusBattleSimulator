@@ -50,7 +50,9 @@ class Fighter:
     threat: float = 0.0               # "Veszély" value of the character sheet
     role: str = "dps"                 # "tank" | "dps" | "healer"
     is_main: bool = False
-    profile_url: str = ""             # the player's own character (not a mercenary)
+    profile_url: str = ""
+    flag: str = ""                    # nationality flag from the profile: 2-letter code and/or image URL
+    flag_url: str = ""
 
     # Arena specific god / pact buffs: minerva, mars, apollo,
     # honour_veteran, honour_destroyer

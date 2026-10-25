@@ -67,6 +67,8 @@ tudtam ellenőrizni; ha nem talál semmit, a `debug_pages` jelölőnégyzettel m
 
 **Egyesületi jelentés:** a guild szimuláció után a program a játékbeli jelentéshez hasonló HTML oldalt készít (két zászló/felirat fent, győztes sor, páronként a sebzés/pontszám, győztes oldalon 👍, alul az összpontszám), és megnyitja a böngészőben; a *Jelentés megnyitása* gombbal újra előhozható.
 
+**Zászlók:** a jelentésben a játékosok neve mellett a profil *Nyelv:* sorában látható nemzetiségi zászló jelenik meg (ahol van; a játék saját képét tölti be, ennek hiányában a kódból zászló-emojit rajzol). A profil markupját a játékon nem tudtam ellenőrizni, ezért a felismerés többféle alakot tűr; ha egy zászló hiányzik, a `debug_pages` jelölőnégyzettel mentett profiloldal megmutatja a pontos szerkezetet.
+
 **Nyelv:** a menüsor *Nyelv / Language* menüjében magyar és angol között lehet váltani, azonnal, az adatok elvesztése nélkül (a már kiírt eredményszöveg a régi nyelven marad, a következő szimulációtól az újon jelenik meg). A választás a felhasználó könyvtárában a `.gladiatus_sim_lang` fájlban megmarad. A szövegek a `gladiatus_sim/i18n.py` katalógusban vannak.
 
 A **Simulate battle** gomb lefuttatja a szimulációt és kiírja az eredményt.

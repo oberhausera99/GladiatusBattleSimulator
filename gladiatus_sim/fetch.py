@@ -286,6 +286,39 @@ class RawCharacter:
     percents: List[int]
 
 
+_LANG_LABEL = re.compile(r"(?:nyelv|language|sprache|langue|idioma|lingua|j[eę]zyk|dil|язык|taal|jazyk|limba|γλώσσα)\s*:?", re.I)
+_FLAG_CODE = [re.compile(p, re.I) for p in (
+    r"flags?[/_\-.]+(?:\w+[/_\-.]+)?([a-z]{2})(?![a-z])",       # .../flags/hu.gif, flag_hu, flag-hu
+    r"(?:^|[^a-z])([a-z]{2})\.(?:gif|png|jpg|svg)",               # .../hu.gif
+    r"lang(?:uage)?[_\-]([a-z]{2})(?![a-z])")]
+
+
+def parse_flag(html: str, page_url: str = "") -> Tuple[str, str]:
+    """Nationality flag of a player's profile page, next to the 'Nyelv:' label.
+    Returns (two-letter code or '', absolute image URL or '')."""
+    for m in _LANG_LABEL.finditer(html):
+        seg = html[m.end(): m.end() + 600]
+        end = re.search(r"</tr>|<tr[\s>]", seg, re.I)       # stay within the same table row
+        if end:
+            seg = seg[:end.start()]
+        img = re.search(r"<img\b[^>]*>", seg, re.I)
+        tag = img.group(0) if img else seg
+        src = re.search(r'src\s*=\s*["\']([^"\']+)', tag, re.I)
+        code = ""
+        for pat in _FLAG_CODE:
+            c = pat.search(tag)
+            if c:
+                code = c.group(1).lower()
+                break
+        if not code:
+            c = re.search(r'(?:alt|title)\s*=\s*["\']([A-Za-z]{2})["\']', tag)
+            code = c.group(1).lower() if c else ""
+        url = urllib.parse.urljoin(page_url, htmllib.unescape(src.group(1))) if src else ""
+        if code or url:
+            return code, url
+    return "", ""
+
+
 def parse_character_page(html: str, head: int = 40000) -> RawCharacter:
     if _backup_mode(html):
         raise FetchError("the game server is in backup mode")
@@ -381,10 +414,12 @@ def to_fighter(raw: RawCharacter, role: str = "dps", is_main: bool = False,
 
 def fetch_arena_fighter(client: Client, name: str, country: str, server: str) -> Fighter:
     pid, real_name = search_player(client, country, server, name)
-    html = client.request(client.url(country, server, f"mod=player&p={pid}"))
+    url = client.url(country, server, f"mod=player&p={pid}")
+    html = client.request(url)
     raw = parse_character_page(html)
     f = to_fighter(raw, use_current_life=True)
     f.name = f"{real_name}@s{server}-{country}"
+    f.flag, f.flag_url = parse_flag(html, url)
     veteran = raw.percents[2] - php_round(raw.crit_points * 52 / max(2, raw.level - 8) / 5) == 10 \
         if len(raw.percents) >= 4 else False
     if veteran:
@@ -547,10 +582,12 @@ def fetch_guild_members(client: Client, country: str, server: str, gid: str) -> 
 
 def fetch_arena_fighter_by_id(client: Client, pid: str, country: str, server: str,
                               name: str = "") -> Fighter:
-    html = client.request(client.url(country, server, f"mod=player&p={pid}"))
+    url = client.url(country, server, f"mod=player&p={pid}")
+    html = client.request(url)
     raw = parse_character_page(html)
     f = to_fighter(raw, use_current_life=True)
     f.name = name or raw.name
+    f.flag, f.flag_url = parse_flag(html, url)
     if len(raw.percents) >= 4 and \
             raw.percents[2] - php_round(raw.crit_points * 52 / max(2, raw.level - 8) / 5) == 10:
         f.buffs = frozenset({"honour_veteran"})

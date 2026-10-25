@@ -161,3 +161,11 @@ def test_guild_report_html():
                                  intelligence=50, armor=100, damage=(d, d + 20)) for i in range(3)]
     text, html = run_guild(GuildSide("Red", "1", fs("r", 80)), GuildSide("Blue<x>", "2", fs("b", 10)[:2]), 1, seed=1)
     assert "&#128077;" in html and "Blue&lt;x&gt;" in html and "<table>" in html and "r0" in html
+
+
+def test_guild_report_flags():
+    from gladiatus_sim.gui_logic import GuildSide, run_guild
+    mk = lambda n, flag: Fighter(name=n, level=50, life=1000, skill=100, agility=100, charisma=50, intelligence=50,
+                                 armor=100, damage=(50, 70), flag=flag, flag_url="https://x/f/%s.gif" % flag if flag else "")
+    text, html = run_guild(GuildSide("A", "1", [mk("a1", "hu")]), GuildSide("B", "2", [mk("b1", "")]), 1, seed=1)
+    assert 'src="https://x/f/hu.gif"' in html and html.count('class="flag"') == 1
