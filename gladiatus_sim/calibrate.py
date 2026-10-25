@@ -58,6 +58,24 @@ def team_roles(rep: Report, side: str, tank_mercs: int = 1) -> dict:
     return roles
 
 
+def roles_from_profiles(rep: Report, client, country: str, server: str) -> dict:
+    """The real role assignment, read from the players' public profile pages (the
+    same way the game's page shows it). Note: it is the *current* assignment, which
+    can differ from the one used when the report was recorded."""
+    from .fetch import parse_roles
+    roles: dict = {}
+    for side in ("A", "D"):
+        team = [f for f in rep.fighters if f.side == side]
+        pid = team[0].player_id
+        if not pid:
+            continue
+        html = client.request(client.url(country, server, f"mod=player&doll=2&p={pid}"))
+        for f, role in zip(team, parse_roles(html, country)):
+            if role is not None:
+                roles[f.fid] = role
+    return roles
+
+
 def report_to_teams(rep: Report, roles: Optional[dict] = None, auto_tank: bool = True) -> Tuple[List[Fighter], List[Fighter], dict]:
     """(attackers, defenders, pair_overrides). `roles`: {fid: 'tank'|'dps'|'healer'}."""
     if roles is None:

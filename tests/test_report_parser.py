@@ -49,3 +49,21 @@ def test_report_to_simulation_runs():
     res = simulate_turma(att, dfd, runs=30, seed=1, pair_overrides=ov)
     assert 0 <= res.win_chance <= 100
     assert 40_000 < res.avg_points[0] < 300_000
+
+
+def test_player_ids_and_roles_from_profile():
+    from gladiatus_sim.calibrate import roles_from_profiles
+    from gladiatus_sim.fetch import Client
+    from tests import fake_game as fg
+    r = _report()
+    assert r.fighters[0].player_id and r.fighters[5].player_id
+    tt = {2: "Quest: Direct attention to oneself", 3: "Quest: Dish out damage",
+          4: "Quest: Heal group members", 5: "Quest: Do not take with"}
+    mk = lambda: {2: fg.make_character("X", role_map=tt)}
+    srv, base = fg.start({r.fighters[0].player_id: mk(), r.fighters[5].player_id: mk()}, {})
+    try:
+        roles = roles_from_profiles(r, Client(base=base, delay=0), "en", "1")
+    finally:
+        srv.shutdown()
+    assert roles[1] == "tank" and roles[2] == "dps" and roles[3] == "healer" and roles[4] == "out"
+    assert roles[11] == "tank" and roles[13] == "healer" and roles[14] == "out"

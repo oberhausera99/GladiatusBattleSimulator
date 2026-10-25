@@ -58,6 +58,7 @@ class ReportFighter:
     heal_dealt: int = 0
     heal_taken: int = 0
     threat_total: int = 0
+    player_id: str = ""            # a játékos azonosítója (csak a főkarakternél van link)
 
 
 @dataclass
@@ -145,7 +146,10 @@ def _parse_stats_table(h: str, fighters: list[ReportFighter]) -> None:
     j = h.find("</table>", i)
     rows = re.findall(r"<tr>\s*<th[^>]*>(.*?)</th>(.*?)</tr>", h[i:j], re.S)
     rows = [(n, c) for n, c in rows if "<td" in c]
-    for f, (_, cells) in zip(fighters, rows):
+    for f, (head, cells) in zip(fighters, rows):
+        m = re.search(r"mod=player&(?:amp;)?p=(\d+)", head)
+        if m:
+            f.player_id = m.group(1)
         vals = [_num(_text(c)) for c in re.findall(r"<td[^>]*>(.*?)</td>", cells, re.S)]
         if len(vals) >= 5:
             f.dmg_dealt, f.dmg_taken, f.heal_dealt, f.heal_taken, f.threat_total = vals[:5]
