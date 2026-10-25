@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from .arena import simulate_arena
 from .fetch import (Client, FetchError, fetch_arena_fighter, fetch_arena_fighter_by_id,
                     fetch_guild_info, fetch_guild_members, fetch_turma_team, parse_player_spec, search_guild)
+from .bestplayer import (collect_candidates, load_fighters, parse_server_range, tournament)
 from .guild import simulate_guild
 from .fighter import Fighter
 from .turma import TurmaRules, normalize_team, simulate_turma
@@ -230,3 +231,48 @@ def guild_summary(a: "GuildSide", d: "GuildSide") -> str:
             t += f", {len(g.failed)} nem olvasható"
         parts.append(t)
     return "Statok letöltve. " + " | ".join(parts)
+
+
+@dataclass
+class BestSet:
+    fighters: List[Fighter]
+    server_errors: dict = field(default_factory=dict)
+    failed: List[str] = field(default_factory=list)
+    level_min: int = 0
+    level_max: int = 0
+    servers: int = 0
+
+
+def fetch_best_set(level_min: int, level_max: int, servers_text: str, per_server: int,
+                   country: str = "en", client: Optional[Client] = None, progress=None) -> BestSet:
+    """Players of the level interval from the highscore of every listed server."""
+    client = client or Client(cache_dir=cache_dir())
+    client.delay = min(client.delay, 0.12)
+    servers = parse_server_range(servers_text)
+    if not servers:
+        raise FetchError("add meg legalább egy szervert (pl. 1-60)")
+    cands, errors = collect_candidates(client, servers, country, level_min, level_max, per_server, progress)
+    if len(cands) < 2:
+        raise FetchError(f"a {level_min}-{level_max} szinttartományban kevesebb mint 2 játékost találtam "
+                         f"({len(errors)} szerver hibás)")
+    fighters, failed = load_fighters(client, cands, progress)
+    if len(fighters) < 2:
+        raise FetchError("kevesebb mint 2 játékos adatlapját sikerült beolvasni")
+    return BestSet(fighters, errors, failed, level_min, level_max, len(servers))
+
+
+def best_text(b: BestSet, opponents: int, samples: int, seed: Optional[int] = None, progress=None) -> str:
+    top = tournament(b.fighters, opponents=opponents, samples=samples, seed=seed, progress=progress)
+    lines = [f"Legjobb játékosok: {b.level_min}-{b.level_max} szint, {b.servers} szerver, {len(b.fighters)} játékos "
+             f"(teljes életerővel, aréna szabályok szerint)", "",
+             "  #  játékos                       szint  döntő győzelem%  selejtező győzelem%"]
+    for i, r in enumerate(top, 1):
+        lines.append(f"  {i}  {r.fighter.name[:28]:28s} {r.fighter.level:5d}  {r.final:14.1f}  {r.stage1:18.1f}")
+    lines += ["", "Módszer: minden játékos véletlen ellenfelekkel mérkőzik (selejtező), a legjobbak körmérkőzést",
+              "játszanak egymással (döntő). A győzelem% az ellenfelek mezőnyétől függ."]
+    if b.server_errors:
+        lines.append(f"Nem elérhető szerverek ({len(b.server_errors)}): " +
+                     ", ".join(f"s{k}" for k in sorted(b.server_errors, key=int)[:20]))
+    if b.failed:
+        lines.append(f"Nem olvasható adatlap: {len(b.failed)} játékos")
+    return "\n".join(lines)

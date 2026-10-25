@@ -55,6 +55,7 @@ class Handler(BaseHTTPRequestHandler):
     names = {}        # name -> id
     guilds = {}       # guild name -> id
     members = {}      # guild id -> [(player id, name, rank, level)]
+    highscore = []    # pages of [(player id, name, level)]
 
     def log_message(self, *a):
         pass
@@ -79,6 +80,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         q = parse_qs(urlparse(self.path).query)
+        if q.get("mod", [""])[0] == "highscore" and self.highscore:
+            pg = int(q.get("page", ["0"])[0])
+            rows = "".join(
+                f'<tr><td>{pg * 10 + k + 1}</td><td class="ellipsis"><a href="index.php?mod=player&p={pid}&sh=x">{nm}</a></td>'
+                f'<td>{lv}</td><td>1.234</td></tr>' for k, (pid, nm, lv) in enumerate(self.highscore[pg]))
+            nav = "".join(f'<a href="index.php?mod=highscore&amp;page={i}&amp;sh=x">{i + 1}</a>'
+                          for i in range(len(self.highscore)))
+            guild = '<a href="index.php?mod=highscore&amp;t=1&amp;sh=x">Guilds</a>'
+            self._send("<html>" + PAD + "<table><tr><th>Rank</th><th>Name</th><th>Level</th><th>Fame</th></tr>"
+                       + rows + "</table>" + nav + guild + PAD + "</html>")
+            return
         if q.get("submod", [""])[0] == "memberList":
             rows = "".join(
                 f'<tr><td><a href="index.php?mod=player&p={pid}&sh=x">{nm}</a></td><td>{rk}</td><td>{lv}</td>'
@@ -92,7 +104,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send(page(ch) if ch else "<html>" + PAD + "nothing</html>")
 
 
-def start(players, names, guilds=None, members=None):
+def start(players, names, guilds=None, members=None, highscore=None):
+    Handler.highscore = highscore or []
     Handler.players, Handler.names = players, names
     Handler.guilds, Handler.members = guilds or {}, members or {}
     srv = HTTPServer(("127.0.0.1", 0), Handler)

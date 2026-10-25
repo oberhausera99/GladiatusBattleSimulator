@@ -56,6 +56,14 @@ eredmény: összpontszám + minden párharc (ki kivel, ki nyert). A minta alapé
 egyesületi keresés a játék kereső oldalán nem volt ellenőrizhető, ha nem találja a nevet, add meg az
 azonosítót. A letöltés gyorsítása: gzip tömörítés, 8 párhuzamos szál oldalanként, a két egyesület egyszerre töltődik, a kérések közti szünet önmagát hangolja (503 esetén lassít, utána fokozatosan gyorsul), és a letöltött lapok 10 percig a lemezen (`%TEMP%/gladiatus_sim_cache`) gyorsítótárban vannak, így az ismételt Get stats azonnali. A csatákhoz a tagok **aktuális** életerejével számol (a letöltés pillanatában), ahogy az aréna is; a GUI-ban egy jelölőnégyzettel a teljes életerőre lehet váltani (`life_mode="full"`).
 
+**Legjobb játékos** (negyedik mód): szintintervallum (pl. 130-150), EN szerverek (pl. `1-60`) és korlátok
+megadása után a Get stats a szerverek játékos-toplistáját járja be (a lapok saját lapozó linkjeit követi,
+a szint oszlopot a fejléc szövegéből találja meg), az intervallumba eső játékosoknak letölti az aréna
+karakterét, a Simulate battle pedig versenyt rendez: mindenki véletlen ellenfelekkel mérkőzik (selejtező),
+a legjobbak körmérkőzést játszanak (döntő), a végén az 5 legerősebb játékos kerül kiírásra. A toplista
+markupját a játékon nem tudtam ellenőrizni; ha a keresés nem talál játékost, a `debug_pages` jelölőnégyzettel
+mentsd a lapokat.
+
 A **Simulate battle** gomb lefuttatja a szimulációt és kiírja az eredményt.
 Linuxon a `python3-tk` csomag kell hozzá.
 
