@@ -35,6 +35,20 @@ próbáltam ki (`tests/fake_game.py`), éles játékoldallal nem. Ha egy lekérd
 "could not find ... on the page" hibát ad, futtasd `--save-html mappa` kapcsolóval,
 és a mentett oldalak alapján javítható a szerkezet.
 
+## Grafikus felület
+
+```
+python -m gladiatus_sim gui      # vagy: gladiatus-sim gui
+```
+
+Add meg a támadó és a védő nevét + szerverét (pl. `s51-en`), a szimulációk számát, majd
+**Get stats**. Turmánál a két csapat tagjai között lehet váltani (★ = a játékos saját
+karaktere), a középső táblázat mindig a kiválasztott két harcos statjait mutatja egymással
+szemben (az esélyek egymás ellen értendők). A kiválasztott harcos **szerepe** (tank, támadó,
+gyógyító, tétlen) átállítható. Két vagy több tankra állított zsoldos a játék szabálya szerint
+tétlen lesz. A **Simulate battle** gomb lefuttatja a szimulációt és kiírja az eredményt.
+Linuxon a `python3-tk` csomag kell hozzá.
+
 ## Használat
 
 ```bash

@@ -225,9 +225,21 @@ class _Engine:
         return True
 
 
+def normalize_team(team: Sequence[Fighter]) -> List[Fighter]:
+    """Apply the game's role rules: idle fighters stay out, and if two or more
+    mercenaries are set to tank they all become idle."""
+    team = [f for f in team if f.role != "out"]
+    tanks = [f for f in team if f.role == "tank" and not f.is_main]
+    if len(tanks) >= 2:
+        team = [f for f in team if f not in tanks]
+    return team
+
+
 def turma_battle(attackers: Sequence[Fighter], defenders: Sequence[Fighter],
                  rng: random.Random, rules: Optional[TurmaRules] = None,
                  pair_overrides: Optional[dict] = None) -> TurmaBattle:
+    if not pair_overrides:
+        attackers, defenders = normalize_team(attackers), normalize_team(defenders)
     return _Engine((attackers, defenders), rules or TurmaRules(), pair_overrides).run(rng)
 
 
@@ -254,6 +266,8 @@ def simulate_turma(attackers: Sequence[Fighter], defenders: Sequence[Fighter],
                    pair_overrides: Optional[dict] = None) -> TurmaResult:
     rng = random.Random(seed)
     rules = rules or TurmaRules()
+    if not pair_overrides:
+        attackers, defenders = normalize_team(attackers), normalize_team(defenders)
     eng = _Engine((attackers, defenders), rules, pair_overrides)
     wins = draws = 0
     pts = [0.0, 0.0]

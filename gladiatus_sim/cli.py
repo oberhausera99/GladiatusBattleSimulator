@@ -148,6 +148,8 @@ def main(argv=None) -> int:
     fp.add_argument("--rule", action="append", metavar="KEY=VALUE")
     fp.add_argument("--save-html", metavar="DIR", help="save the downloaded raw pages here (debugging)")
     fp.set_defaults(fn=cmd_fight)
+    gp = sub.add_parser("gui", help="open the graphical interface")
+    gp.set_defaults(fn=lambda args: __import__("gladiatus_sim.gui", fromlist=["main"]).main())
     sp2 = sub.add_parser("show", help="download one player and print JSON")
     sp2.add_argument("mode", choices=["arena", "turma"])
     sp2.add_argument("player", help="NAME@SERVER, e.g. Aveloca@s59-en")

@@ -278,7 +278,8 @@ def fetch_arena_fighter(client: Client, name: str, country: str, server: str) ->
     return f
 
 
-def fetch_turma_team(client: Client, name: str, country: str, server: str) -> List[Fighter]:
+def fetch_turma_team(client: Client, name: str, country: str, server: str,
+                     keep_idle: bool = False) -> List[Fighter]:
     pid, real_name = search_player(client, country, server, name)
     team: List[Fighter] = []
     roles = None
@@ -288,7 +289,7 @@ def fetch_turma_team(client: Client, name: str, country: str, server: str) -> Li
         html = client.request(client.url(country, server, f"mod=player&doll={doll}&p={pid}"))
         if slot == 0:
             roles = parse_roles(html, country)
-        if roles[slot] == "out":
+        if roles[slot] == "out" and not keep_idle:
             continue
         raw = parse_character_page(html)
         label = f"{real_name}@s{server}-{country}" if slot == 0 else f"{raw.name} #{slot}"

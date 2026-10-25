@@ -17,6 +17,9 @@ def php_round(x: float) -> int:
     return int(math.floor(x + 0.5)) if x >= 0 else -int(math.floor(-x + 0.5))
 
 
+ROLES = ("tank", "dps", "healer", "out")   # "out": idle, does not take part
+
+
 @dataclass
 class Fighter:
     name: str
@@ -57,7 +60,7 @@ class Fighter:
         self.buffs = frozenset(self.buffs)
         if self.current_life is None:
             self.current_life = self.life
-        if self.role not in ("tank", "dps", "healer"):
+        if self.role not in ROLES:
             raise ValueError(f"unknown role {self.role!r}")
 
     @classmethod
