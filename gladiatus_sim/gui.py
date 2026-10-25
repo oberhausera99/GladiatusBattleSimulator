@@ -57,6 +57,9 @@ class App(ttk.Frame):
         ttk.Spinbox(f, from_=10, to=100000, increment=100, textvariable=self.v_runs, width=8).grid(row=0, column=6)
         self.btn_get = ttk.Button(f, text="Get stats", command=self.get_stats)
         self.btn_get.grid(row=1, column=5, columnspan=2, sticky="ew", padx=(14, 0))
+        self.v_full_life = tk.BooleanVar(value=False)
+        ttk.Checkbutton(f, text="Egyesületi csata: teljes életerővel számol (alapból az aktuális)",
+                        variable=self.v_full_life).grid(row=3, column=1, columnspan=5, sticky="w", padx=(14, 0))
         self.v_debug = tk.BooleanVar(value=False)
         ttk.Checkbutton(f, text="Letöltött lapok mentése (debug_pages mappába)",
                         variable=self.v_debug).grid(row=2, column=1, columnspan=5, sticky="w", padx=(14, 0))
@@ -234,7 +237,9 @@ class App(ttk.Frame):
             return
         self._busy(True, f"Szimuláció fut ({runs} csata)...")
         mode, a, d = self.mode, self.team_a, self.team_d
-        self._run_thread(lambda: gl.run_simulation(mode, a, d, runs, TurmaRules()), self._sim_done)
+        life_mode = "full" if self.v_full_life.get() else "current"
+        self._run_thread(lambda: gl.run_simulation(mode, a, d, runs, TurmaRules(), life_mode=life_mode),
+                         self._sim_done)
 
     def _sim_done(self, text, err):
         if err is not None:

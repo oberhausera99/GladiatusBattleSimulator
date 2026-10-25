@@ -27,6 +27,11 @@ def _fmt(x: float) -> str:
     return f"{x:,.0f}".replace(",", " ")
 
 
+def _life(f: Fighter) -> str:
+    cur = f.current_life if f.current_life is not None else f.life
+    return _fmt(f.life) if round(cur) == round(f.life) else f"{_fmt(cur)} / {_fmt(f.life)}"
+
+
 def stat_rows(a: Fighter, d: Fighter) -> List[Tuple[str, str, str]]:
     """Rows (label, attacker value, defender value) of the head-to-head table.
     Chances are the ones of each fighter *against the other one*."""
@@ -40,7 +45,7 @@ def stat_rows(a: Fighter, d: Fighter) -> List[Tuple[str, str, str]]:
     rows = [
         ("Név", a.name, d.name),
         ("Szint", str(a.level), str(d.level)),
-        ("Életerő", _fmt(a.life), _fmt(d.life)),
+        ("Életerő (aktuális / max)", _life(a), _life(d)),
         ("Ügyesség", _fmt(a.skill), _fmt(d.skill)),
         ("Fürgeség", _fmt(a.agility), _fmt(d.agility)),
         ("Karizma", _fmt(a.charisma), _fmt(d.charisma)),
@@ -115,7 +120,7 @@ def fetch_guild_side(name: str, server: str, client: Optional[Client] = None, pr
     suspicious = [f"{f.name} (L{f.level}, élet {f.life:.0f}, sebzés {f.damage[0]:.0f}-{f.damage[1]:.0f})"
                   for f in fighters
                   if f.life <= 0 or f.damage[1] <= 0 or f.skill <= 0 or f.level <= 0
-                  or f.life < 100 * f.level or f.damage[1] < 1.03 * f.damage[0]]
+                  or f.damage[1] < 1.03 * f.damage[0]]
     if not fighters:
         raise FetchError(f"{gname}: egyik tag adatlapját sem sikerült beolvasni "
                          f"({failed[0] if failed else 'nincs tag'})")
@@ -143,10 +148,10 @@ def fetch_players(mode: str, att: Tuple[str, str], dfd: Tuple[str, str],
 
 
 def run_simulation(mode: str, a, d, runs: int, rules: Optional[TurmaRules] = None,
-                   seed: Optional[int] = None) -> str:
+                   seed: Optional[int] = None, life_mode: str = "current") -> str:
     """Run the simulation and return the human readable result text."""
     if mode == "guild":
-        return _guild_text(a, d, runs, seed)
+        return _guild_text(a, d, runs, seed, life_mode)
     if mode == "arena":
         r = simulate_arena(a, d, runs=runs, seed=seed)
         return (f"Aréna csata, {r.runs} szimuláció\n"
@@ -171,8 +176,8 @@ def run_simulation(mode: str, a, d, runs: int, rules: Optional[TurmaRules] = Non
     return "\n".join(lines)
 
 
-def _guild_text(a: "GuildSide", d: "GuildSide", runs: int, seed: Optional[int]) -> str:
-    r = simulate_guild(a.fighters, d.fighters, runs=runs, seed=seed)
+def _guild_text(a: "GuildSide", d: "GuildSide", runs: int, seed: Optional[int], life_mode: str = "current") -> str:
+    r = simulate_guild(a.fighters, d.fighters, runs=runs, seed=seed, life_mode=life_mode)
     f = r.first
     verdict = {"attacker": f"{a.name} nyer", "defender": f"{d.name} nyer", "draw": "döntetlen"}[f.winner]
     lines = [f"Egyesületi csata: {a.name} (támadó, {len(a.fighters)} tag) vs {d.name} (védő, {len(d.fighters)} tag)",
@@ -196,7 +201,7 @@ def _guild_text(a: "GuildSide", d: "GuildSide", runs: int, seed: Optional[int]) 
     for g in (a, d):
         exp = f" / oldal szerint {g.expected}" if g.expected else ""
         full = f" [{g.full_name}]" if g.full_name else ""
-        lines.append(f"  {g.name}{full}: lista {g.listed} tag{exp}, beolvasva {len(g.fighters)}, hibás {len(g.failed)}")
+        lines.append(f"  {g.name}{full}: életerő: {'teljes' if life_mode == 'full' else 'aktuális'}; lista {g.listed} tag{exp}, beolvasva {len(g.fighters)}, hibás {len(g.failed)}")
         for x in g.failed[:15]:
             lines.append(f"    ! nem olvasható: {x}")
         for x in g.suspicious[:15]:

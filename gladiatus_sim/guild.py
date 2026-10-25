@@ -1,5 +1,8 @@
 """Guild battle (egyesületi csata) simulator.
 
+Life: by default the *current* life of the members at download time is used, as in the arena;
+``life_mode='full'`` uses the maximum life instead.
+
 Rules (as described by the game's players): the members of the two guilds are paired
 randomly and every pair fights an arena battle. If one guild has more members, the
 unpaired members win without a fight. A won fight is worth 2 points for the member's
@@ -49,7 +52,7 @@ class GuildBattleResult:
 
 
 def guild_battle(attackers: Sequence[Fighter], defenders: Sequence[Fighter],
-                 rng: random.Random, life_mode: str = "full") -> GuildBattleResult:
+                 rng: random.Random, life_mode: str = "current") -> GuildBattleResult:
     a = list(attackers)
     d = list(defenders)
     rng.shuffle(a)
@@ -92,7 +95,7 @@ class GuildSimulation:
 
 def simulate_guild(attackers: Sequence[Fighter], defenders: Sequence[Fighter],
                    runs: int = 1, seed: Optional[int] = None,
-                   life_mode: str = "full") -> GuildSimulation:
+                   life_mode: str = "current") -> GuildSimulation:
     rng = random.Random(seed)
     w = dr = 0
     pts = [0.0, 0.0]

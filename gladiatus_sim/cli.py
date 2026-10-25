@@ -119,9 +119,9 @@ def cmd_guild_check(args) -> int:
         return 2
     print(f"\n{g.name} (id {g.gid}) full name: {g.full_name or '?'}  listed {g.listed}  "
           f"page says {g.expected}  loaded {len(g.fighters)}  failed {len(g.failed)}")
-    print(f"{'name':24s} {'id':>8s} lvl   life   skill  agil   char   int    armor  dmg")
+    print(f"{'name':24s} {'id':>8s} lvl  curLife maxLife skill  agil   char   int    armor  dmg")
     for f in g.fighters:
-        print(f"{f.name[:24]:24s} {getattr(f, 'pid', ''):>8s} {f.level:3d} {f.life:7.0f} {f.skill:6.0f} {f.agility:6.0f} {f.charisma:6.0f} "
+        print(f"{f.name[:24]:24s} {getattr(f, 'pid', ''):>8s} {f.level:3d} {(f.current_life if f.current_life is not None else f.life):7.0f} {f.life:7.0f} {f.skill:6.0f} {f.agility:6.0f} {f.charisma:6.0f} "
               f"{f.intelligence:6.0f} {f.armor:7.0f} {f.damage[0]:.0f}-{f.damage[1]:.0f}")
     for x in g.failed:
         print("FAILED:", x)

@@ -54,7 +54,7 @@ egyik egyesületben több tag van, a felesleg ellenfél nélkül automatikusan n
 +2 pont; döntetlen esetén a védő egyesület tagja nyer (+2). Több pontot szerző egyesület a győztes. Az
 eredmény: összpontszám + minden párharc (ki kivel, ki nyert). A minta alapértelmezése 1 csata. Az
 egyesületi keresés a játék kereső oldalán nem volt ellenőrizhető, ha nem találja a nevet, add meg az
-azonosítót. A csatákhoz a tagok teljes életerejével számol (`life_mode="full"`).
+azonosítót. A csatákhoz a tagok **aktuális** életerejével számol (a letöltés pillanatában), ahogy az aréna is; a GUI-ban egy jelölőnégyzettel a teljes életerőre lehet váltani (`life_mode="full"`).
 
 A **Simulate battle** gomb lefuttatja a szimulációt és kiírja az eredményt.
 Linuxon a `python3-tk` csomag kell hozzá.
