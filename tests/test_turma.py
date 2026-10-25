@@ -71,3 +71,12 @@ def test_seed_reproducible():
 def test_real_report_runs(report):
     r = simulate_turma(report["att"], report["dfn"], runs=20, seed=1)
     assert r.runs == 20 and r.avg_deaths == [0.0, 0.0]
+
+
+def test_role_targeting_dps_mercs_go_for_the_main_character():
+    att = team("a", 5, life=10**7)
+    dfn = team("d", 5, life=10**7)
+    for f in att[1:]:
+        f.role = "dps"
+    r = simulate_turma(att, dfn, runs=100, seed=2)
+    assert r.main_hit_share[0] > 0.8

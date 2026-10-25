@@ -34,6 +34,14 @@ class TurmaRules:
     targeting: str = "weighted"        # "weighted" | "uniform"
     main_multiplier: float = 10.0      # threat multiplier of the player's character (fit on 75 reports; depends on tank_targeting)
     tank_multiplier: float = 1.0       # extra multiplier of tank mercenaries
+    # "roles": targeting by the role of the attacker (fit on ~100 reports with named
+    # mercenaries): dps/healer mercs go for the enemy main character almost always,
+    # tank mercs choose by threat, the main character ramps up its focus over time.
+    # "weighted": the old single threat-weighted draw for everybody.
+    role_targeting: bool = True
+    dps_main_prob: float = 0.96            # P(a dps/healer merc swings at the enemy main)
+    tank_main_mult: float = 2.2            # threat multiplier of the enemy main for a tank merc
+    main_focus: tuple = ((10, 0.27), (20, 0.78), (30, 0.89), (50, 0.93))   # (until round, P(main))
     # how the tank merc itself picks targets: "same" (like everybody), "uniform",
     # "weak" (threat weights without the main character multiplier)
     tank_targeting: str = "weak"
@@ -140,7 +148,28 @@ class _Engine:
         alive = [j for j, e in enumerate(opp) if self.life[1 - s][j] > 0]
         w = [self.weights[1 - s][j] for j in alive]
         me = self.t[s][i] if i is not None else None
-        if me is not None and me.role == "tank" and not me.is_main and self.r.tank_targeting != "same":
+        if self.r.role_targeting and self.r.targeting != "uniform" and me is not None:
+            main_j = next((j for j in alive if opp[j].is_main), None)
+            others = [j for j in alive if j != main_j]
+            if main_j is not None:
+                if me.is_main:
+                    p = next((pp for until, pp in self.r.main_focus if self.cur_round <= until), self.r.main_focus[-1][1])
+                elif me.role == "tank":
+                    wm = max(opp[main_j].threat, 1.0) * self.r.tank_main_mult
+                    wo = sum(max(opp[j].threat, 1.0) for j in others)
+                    p = wm / (wm + wo) if wo > 0 else 1.0
+                else:
+                    p = self.r.dps_main_prob
+                if not others or rng.random() < p:
+                    return main_j
+                tw = [max(opp[j].threat, 1.0) for j in others]
+                x = rng.random() * sum(tw)
+                for j, wj in zip(others, tw):
+                    x -= wj
+                    if x < 0:
+                        return j
+                return others[-1]
+        if (not self.r.role_targeting) and me is not None and me.role == "tank" and not me.is_main and self.r.tank_targeting != "same":
             if self.r.tank_targeting == "uniform":
                 w = [1.0] * len(alive)
             elif self.r.tank_targeting == "weak":
@@ -160,6 +189,7 @@ class _Engine:
         st = [[FighterStats(f.name) for f in team] for team in self.t]
         rounds_done = 0
         for rnd in range(1, self.r.rounds + 1):
+            self.cur_round = rnd
             if not all(any(l > 0 for l in lv) for lv in self.life):
                 break
             order = [(s, i) for s in (0, 1) for i in range(len(self.t[s]))

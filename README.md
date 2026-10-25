@@ -149,6 +149,13 @@ jelentésekben pontosan ezek a zsoldosok sebeznek kiugróan. A szerepet a játé
 csak jelentés-elemzésnél kell, ahol nincs profil. A 6 ismert tankú csapaton a `tank_targeting="weak"`,
 `main_multiplier=10` illeszkedik legjobban (tank 0,93, többi zsoldos 0,89, pontszám 1,02x).
 
+**Célzás szerepek szerint (24 jelentés egyedi nevű zsoldosokkal, Aveloca csapata):** az első ütés célpontja az
+ellenfél főkarakterére: támadó zsoldosok 93-96%, gyógyító 97%, **tank zsoldos 54%** (45% -> 60% a harc
+során), **a főkarakter** 27% (1-10. kör) -> 78% -> 89% -> 94%. A tank a maradék célpontokat a veszély
+értékek szerint választja. Ezt építi a `TurmaRules.role_targeting` (alapértelmezett): `dps_main_prob=0.96`,
+`tank_main_mult=2.2`, `main_focus`. A 125 jelentésre a szimulált/valós sebzés a tankra 0,99, a többi
+zsoldosra 0,96 (a régi statikus súlyozással 0,91 és 0,89), a pontszám 1,01x.
+
 **Még nyitott:** az időfüggő célzás pontos szabálya, a zsoldos-tank szerepe (a jelentés nem
 tartalmazza a szerepeket), halálesetek hatása (az elemzett jelentésekben nem halt meg senki).
 
