@@ -34,6 +34,7 @@ class TurmaRules:
     targeting: str = "weighted"        # "weighted" | "uniform"
     main_multiplier: float = 6.5       # threat multiplier of the player's character (50 jelentésre illesztve: 6-7)
     tank_multiplier: float = 1.0       # extra multiplier of tank mercenaries
+    tank_damage_multiplier: float = 1.07  # tank merc bonus on raw weapon damage (fit; ~+20-35% after armor)
     healers_targetable: bool = True
     # --- hit resolution ---
     # "independent": a blokk a kritikus dobástól függetlenül dönt (a 50 jelentés
@@ -111,6 +112,8 @@ class _Engine:
         if rng.random() * 100 >= c["hit"]:
             return Hit.MISSED, 0.0
         base = rng.randint(int(f.damage[0]), int(f.damage[1]))
+        if f.role == "tank" and not f.is_main:
+            base *= self.r.tank_damage_multiplier
         absorb = rng.randint(*c["absorb"])
         if self.r.crit_block_order == "independent":
             crit = rng.random() * 100 < c["crit"] and not rng.random() * 100 < c["avoid"]

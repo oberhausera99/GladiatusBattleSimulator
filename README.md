@@ -110,6 +110,13 @@ az 50 jelentésen az események összege pontosan megegyezik az összesítő tá
   A jelenlegi statikus súlyozás ezt nem adja vissza, de a végeredményre (pontszám) elég jó.
 * Sokkal gyengébb támadók (-140 szint) a főkarakter ellen csak ~60%-ban célozzák.
 
+**Zsoldos-tank (védőre állított zsoldos):** Aveloca csapatában a tank a 373-as szintű utolsó
+Samnit (5. hely). Ugyanolyan statokkal 24,5k sebzést okoz átlagosan, a két másik hasonló
+zsoldos 17,8k-t (+37%). A nyers fegyversebzésre **~7%-os bónusz** (`tank_damage_multiplier`)
+illeszkedik, mert a páncél levonása után ez ~20-35% többlet. Durham csapatában a legtöbbet
+sebző zsoldos (14-es hely) a tank; az aréna-körmérkőzéses tipp (`pick_tank`) ott mást (13-as)
+választott, tehát a "legerősebb zsoldos" nem mindig a tank.
+
 **Még nyitott:** az időfüggő célzás pontos szabálya, a zsoldos-tank szerepe (a jelentés nem
 tartalmazza a szerepeket), halálesetek hatása (az elemzett jelentésekben nem halt meg senki).
 
