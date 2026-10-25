@@ -117,6 +117,12 @@ illeszkedik, mert a páncél levonása után ez ~20-35% többlet. Durham csapat�
 sebző zsoldos (14-es hely) a tank; az aréna-körmérkőzéses tipp (`pick_tank`) ott mást (13-as)
 választott, tehát a "legerősebb zsoldos" nem mindig a tank.
 
+**Megerősítés 75 jelentésen, 14 ellenfél-csapattal:** Aveloca tankja a szimulációhoz képest
+1,16-szor annyit sebez, a többi zsoldosa 0,85-ször; a relatív többlet **+37%**, 14 ellenfélből 11-nél
+látszik. Az ellenfelek csapataiban is mindenhol kiugrik egy zsoldos (átlag 1,7x a többihez képest).
+Az aréna-körmérkőzéses tank-tipp a csapatok 8/14-ében találta el ezt a zsoldost (az "első helyen
+álló zsoldos" 10/14-ben), ezért a tankot lehetőleg meg kell adni (`roles=`).
+
 **Még nyitott:** az időfüggő célzás pontos szabálya, a zsoldos-tank szerepe (a jelentés nem
 tartalmazza a szerepeket), halálesetek hatása (az elemzett jelentésekben nem halt meg senki).
 
