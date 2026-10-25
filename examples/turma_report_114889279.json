@@ -1,0 +1,583 @@
+{
+ "description": "Real Circus Turma report: Aveloca (attackers) vs -Durham- (defenders)",
+ "attackers": [
+  {
+   "name": "Aveloca",
+   "level": 369,
+   "life": 85358,
+   "skill": 4049,
+   "agility": 3120,
+   "charisma": 3121,
+   "intelligence": 3121,
+   "armor": 107031,
+   "damage": [
+    2312,
+    2538
+   ],
+   "critical_chance": 30,
+   "avoid_critical_chance": 25,
+   "block_chance": 50,
+   "healing": 3310,
+   "critical_healing_chance": 13,
+   "threat": 3628,
+   "role": "tank",
+   "is_main": true
+  },
+  {
+   "name": "Samnit A2",
+   "level": 371,
+   "life": 39363,
+   "skill": 2357,
+   "agility": 1778,
+   "charisma": 1259,
+   "intelligence": 1338,
+   "armor": 99300,
+   "damage": [
+    2178,
+    2416
+   ],
+   "critical_chance": 34,
+   "avoid_critical_chance": 6,
+   "block_chance": 50,
+   "healing": 1884,
+   "critical_healing_chance": 5,
+   "threat": 1145,
+   "role": "dps",
+   "is_main": false
+  },
+  {
+   "name": "Samnit A3 (healer)",
+   "level": 373,
+   "life": 23410,
+   "skill": 2333,
+   "agility": 1643,
+   "charisma": 1035,
+   "intelligence": 1303,
+   "armor": 88841,
+   "damage": [
+    1858,
+    2042
+   ],
+   "critical_chance": 8,
+   "avoid_critical_chance": 9,
+   "block_chance": 7,
+   "healing": 10850,
+   "critical_healing_chance": 5,
+   "threat": 720,
+   "role": "healer",
+   "is_main": false
+  },
+  {
+   "name": "Samnit A4",
+   "level": 370,
+   "life": 40342,
+   "skill": 2345,
+   "agility": 1589,
+   "charisma": 1142,
+   "intelligence": 1328,
+   "armor": 98983,
+   "damage": [
+    2186,
+    2424
+   ],
+   "critical_chance": 34,
+   "avoid_critical_chance": 6,
+   "block_chance": 50,
+   "healing": 1876,
+   "critical_healing_chance": 5,
+   "threat": 1063,
+   "role": "tank",
+   "is_main": false
+  },
+  {
+   "name": "Samnit A5",
+   "level": 373,
+   "life": 40972,
+   "skill": 2423,
+   "agility": 1700,
+   "charisma": 1201,
+   "intelligence": 1329,
+   "armor": 99380,
+   "damage": [
+    2183,
+    2421
+   ],
+   "critical_chance": 34,
+   "avoid_critical_chance": 6,
+   "block_chance": 50,
+   "healing": 1877,
+   "critical_healing_chance": 5,
+   "threat": 1104,
+   "role": "dps",
+   "is_main": false
+  }
+ ],
+ "defenders": [
+  {
+   "name": "Durham",
+   "level": 388,
+   "life": 88883,
+   "skill": 4268,
+   "agility": 3298,
+   "charisma": 2780,
+   "intelligence": 3298,
+   "armor": 109337,
+   "damage": [
+    2293,
+    2531
+   ],
+   "critical_chance": 27,
+   "avoid_critical_chance": 25,
+   "block_chance": 50,
+   "healing": 3452,
+   "critical_healing_chance": 11,
+   "threat": 3431,
+   "role": "tank",
+   "is_main": true
+  },
+  {
+   "name": "Samnit D2",
+   "level": 375,
+   "life": 34695,
+   "skill": 2377,
+   "agility": 1611,
+   "charisma": 1258,
+   "intelligence": 1290,
+   "armor": 105418,
+   "damage": [
+    2101,
+    2339
+   ],
+   "critical_chance": 23,
+   "avoid_critical_chance": 18,
+   "block_chance": 50,
+   "healing": 3208,
+   "critical_healing_chance": 4,
+   "threat": 1826,
+   "role": "dps",
+   "is_main": false
+  },
+  {
+   "name": "Samnit D3",
+   "level": 375,
+   "life": 46667,
+   "skill": 2464,
+   "agility": 1665,
+   "charisma": 1297,
+   "intelligence": 1319,
+   "armor": 104216,
+   "damage": [
+    2203,
+    2441
+   ],
+   "critical_chance": 22,
+   "avoid_critical_chance": 25,
+   "block_chance": 50,
+   "healing": 1869,
+   "critical_healing_chance": 4,
+   "threat": 2393,
+   "role": "dps",
+   "is_main": false
+  },
+  {
+   "name": "Samnit D4",
+   "level": 375,
+   "life": 43535,
+   "skill": 2377,
+   "agility": 1611,
+   "charisma": 1258,
+   "intelligence": 1263,
+   "armor": 104216,
+   "damage": [
+    2189,
+    2427
+   ],
+   "critical_chance": 22,
+   "avoid_critical_chance": 25,
+   "block_chance": 50,
+   "healing": 1824,
+   "critical_healing_chance": 4,
+   "threat": 2366,
+   "role": "tank",
+   "is_main": false
+  },
+  {
+   "name": "Samnit D5 (healer)",
+   "level": 373,
+   "life": 33924,
+   "skill": 2309,
+   "agility": 1688,
+   "charisma": 1318,
+   "intelligence": 1345,
+   "armor": 98740,
+   "damage": [
+    1930,
+    2160
+   ],
+   "critical_chance": 10,
+   "avoid_critical_chance": 11,
+   "block_chance": 43,
+   "healing": 15240,
+   "critical_healing_chance": 24,
+   "threat": 600,
+   "role": "healer",
+   "is_main": false
+  }
+ ],
+ "sheet": {
+  "hit_attackers": [
+   [
+    55,
+    71,
+    70,
+    71,
+    70
+   ],
+   [
+    41,
+    59,
+    58,
+    59,
+    58
+   ],
+   [
+    41,
+    59,
+    58,
+    59,
+    58
+   ],
+   [
+    41,
+    59,
+    58,
+    59,
+    58
+   ],
+   [
+    42,
+    60,
+    59,
+    60,
+    58
+   ]
+  ],
+  "double_attackers": [
+   [
+    12,
+    61,
+    58,
+    62,
+    56
+   ],
+   [
+    3,
+    14,
+    14,
+    15,
+    13
+   ],
+   [
+    2,
+    12,
+    11,
+    12,
+    11
+   ],
+   [
+    2,
+    13,
+    12,
+    13,
+    12
+   ],
+   [
+    3,
+    14,
+    13,
+    14,
+    13
+   ]
+  ],
+  "block_attackers_vs_defenders": [
+   [
+    50,
+    50,
+    50,
+    50,
+    50
+   ],
+   [
+    50,
+    50,
+    50,
+    50,
+    50
+   ],
+   [
+    7,
+    7,
+    7,
+    7,
+    7
+   ],
+   [
+    50,
+    50,
+    50,
+    50,
+    50
+   ],
+   [
+    50,
+    50,
+    50,
+    50,
+    50
+   ]
+  ],
+  "hit_defenders": [
+   [
+    57,
+    70,
+    72,
+    72,
+    71
+   ],
+   [
+    43,
+    57,
+    59,
+    59,
+    58
+   ],
+   [
+    44,
+    58,
+    59,
+    60,
+    59
+   ],
+   [
+    43,
+    57,
+    59,
+    59,
+    58
+   ],
+   [
+    42,
+    56,
+    58,
+    59,
+    57
+   ]
+  ],
+  "double_defenders": [
+   [
+    12,
+    50,
+    55,
+    56,
+    53
+   ],
+   [
+    3,
+    13,
+    14,
+    14,
+    13
+   ],
+   [
+    3,
+    13,
+    15,
+    15,
+    14
+   ],
+   [
+    3,
+    13,
+    14,
+    14,
+    13
+   ],
+   [
+    3,
+    13,
+    14,
+    14,
+    13
+   ]
+  ],
+  "block_defenders_vs_attackers": [
+   [
+    50,
+    50,
+    50,
+    50,
+    50
+   ],
+   [
+    50,
+    50,
+    50,
+    50,
+    50
+   ],
+   [
+    50,
+    50,
+    50,
+    50,
+    50
+   ],
+   [
+    50,
+    50,
+    50,
+    50,
+    50
+   ],
+   [
+    50,
+    47,
+    43,
+    49,
+    43
+   ]
+  ],
+  "absorb_attackers": [
+   [
+    1458,
+    1783
+   ],
+   [
+    1353,
+    1654
+   ],
+   [
+    1211,
+    1480
+   ],
+   [
+    1349,
+    1648
+   ],
+   [
+    1354,
+    1655
+   ]
+  ],
+  "absorb_defenders": [
+   [
+    1490,
+    1821
+   ],
+   [
+    1437,
+    1756
+   ],
+   [
+    1421,
+    1736
+   ],
+   [
+    1421,
+    1736
+   ],
+   [
+    1346,
+    1645
+   ]
+  ]
+ },
+ "observed": {
+  "rounds": 50,
+  "deaths": [
+   0,
+   0
+  ],
+  "points": [
+   114814,
+   123757
+  ],
+  "damage_done": [
+   [
+    27793,
+    14007,
+    868,
+    11417,
+    17360
+   ],
+   [
+    28977,
+    9257,
+    21040,
+    28550,
+    581
+   ]
+  ],
+  "damage_taken": [
+   [
+    59895,
+    4791,
+    9177,
+    11737,
+    2805
+   ],
+   [
+    47582,
+    3834,
+    7066,
+    9707,
+    3256
+   ]
+  ],
+  "heal_taken": [
+   [
+    59136,
+    4791,
+    9177,
+    10829,
+    2805
+   ],
+   [
+    46842,
+    3834,
+    7066,
+    9707,
+    3256
+   ]
+  ],
+  "heal_done": [
+   86738,
+   70705
+  ],
+  "swings_received_on_main": [
+   186,
+   172
+  ],
+  "swings_received_total": [
+   221,
+   226
+  ],
+  "damaging_hits": [
+   [
+    26,
+    null,
+    null,
+    null,
+    null
+   ],
+   [
+    20,
+    null,
+    null,
+    null,
+    null
+   ]
+  ],
+  "note": "Report 114889279 (server s59-en). Group rows (mercenaries) share swing counts, so only main-character hit counts are exact. Roles of the mercenary tanks (A4, D4) are guessed from damage received."
+ }
+}

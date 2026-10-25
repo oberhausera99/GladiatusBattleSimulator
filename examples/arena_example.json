@@ -1,0 +1,36 @@
+{
+ "attacker": {
+  "name": "Aveloca",
+  "level": 369,
+  "life": 85358,
+  "skill": 4049,
+  "agility": 3120,
+  "charisma": 3121,
+  "intelligence": 3121,
+  "armor": 107031,
+  "damage": [
+   2312,
+   2538
+  ],
+  "critical_chance": 30,
+  "avoid_critical_chance": 25,
+  "block_chance": 50
+ },
+ "defender": {
+  "name": "Durham",
+  "level": 388,
+  "life": 88883,
+  "skill": 4268,
+  "agility": 3298,
+  "charisma": 2780,
+  "intelligence": 3298,
+  "armor": 109337,
+  "damage": [
+   2293,
+   2531
+  ],
+  "critical_chance": 27,
+  "avoid_critical_chance": 25,
+  "block_chance": 50
+ }
+}
