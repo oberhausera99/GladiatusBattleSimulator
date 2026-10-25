@@ -141,6 +141,10 @@ TEXTS: Dict[str, tuple] = {
     "g_short": (" (az oldal szerint {exp} tag, a lista csak {listed}-et tartalmaz!)",
                 " (the page says {exp} members, the list has only {listed}!)"),
     "g_failed": (", {n} nem olvasható", ", {n} unreadable"),
+    "r_won": ("A {n} egyesület nyert.", "The guild {n} has won."),
+    "r_draw": ("A csata döntetlen.", "The battle is a draw."),
+    "r_name": ("Név", "Name"), "r_damage": ("Sebzés", "Damage"),
+    "btn_report": ("Jelentés megnyitása (böngésző)", "Open report (browser)"),
     # best player result
     "b_head": ("Legjobb játékosok: {lo}-{hi} szint, {srv} szerver, {n} játékos ({how})",
                "Best players: level {lo}-{hi}, {srv} servers, {n} players ({how})"),

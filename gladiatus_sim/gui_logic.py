@@ -13,6 +13,7 @@ from .fetch import (Client, FetchError, fetch_arena_fighter, fetch_arena_fighter
 from .bestplayer import (collect_candidates, discover_servers, load_fighters, load_teams, parse_server_range,
                          tournament)
 from .guild import simulate_guild
+from .report_html import guild_report_html
 from .i18n import t
 from .fighter import Fighter
 from .turma import TurmaRules, normalize_team, simulate_turma
@@ -182,7 +183,7 @@ def run_simulation(mode: str, a, d, runs: int, rules: Optional[TurmaRules] = Non
                    seed: Optional[int] = None, life_mode: str = "current") -> str:
     """Run the simulation and return the human readable result text."""
     if mode == "guild":
-        return _guild_text(a, d, runs, seed, life_mode)
+        return run_guild(a, d, runs, seed, life_mode)[0]
     if mode == "arena":
         r = simulate_arena(a, d, runs=runs, seed=seed)
         return "\n".join([t("arena_head", runs=r.runs),
@@ -207,8 +208,18 @@ def run_simulation(mode: str, a, d, runs: int, rules: Optional[TurmaRules] = Non
     return "\n".join(lines)
 
 
-def _guild_text(a: "GuildSide", d: "GuildSide", runs: int, seed: Optional[int], life_mode: str = "current") -> str:
+def run_guild(a: "GuildSide", d: "GuildSide", runs: int, seed: Optional[int] = None,
+              life_mode: str = "current") -> Tuple[str, str]:
+    """(result text, HTML report) of the same simulated guild battle."""
     r = simulate_guild(a.fighters, d.fighters, runs=runs, seed=seed, life_mode=life_mode)
+    extra = ""
+    if r.runs > 1:
+        extra = t("g_runs", runs=r.runs, a=a.name, w=r.win_chance, dr=r.draw_chance, d=d.name,
+                  l=r.lose_chance, pa=r.avg_points[0], pd=r.avg_points[1]).strip()
+    return _guild_text(a, d, r, life_mode), guild_report_html(a.name, d.name, r.first, extra)
+
+
+def _guild_text(a: "GuildSide", d: "GuildSide", r, life_mode: str = "current") -> str:
     f = r.first
     verdict = {"attacker": t("g_wins", n=a.name), "defender": t("g_wins", n=d.name), "draw": t("g_draw")}[f.winner]
     lines = [t("g_head", a=a.name, na=len(a.fighters), d=d.name, nd=len(d.fighters)),

@@ -65,6 +65,8 @@ eső összes játékost, és letölti az aréna karakterüket. A **Mérés** vá
 játszanak (döntő), és kiírja az 5 legerősebbet. A szerverfelderítést és a toplista markupját a játékon nem
 tudtam ellenőrizni; ha nem talál semmit, a `debug_pages` jelölőnégyzettel mentsd a lapokat.
 
+**Egyesületi jelentés:** a guild szimuláció után a program a játékbeli jelentéshez hasonló HTML oldalt készít (két zászló/felirat fent, győztes sor, páronként a sebzés/pontszám, győztes oldalon 👍, alul az összpontszám), és megnyitja a böngészőben; a *Jelentés megnyitása* gombbal újra előhozható.
+
 **Nyelv:** a menüsor *Nyelv / Language* menüjében magyar és angol között lehet váltani, azonnal, az adatok elvesztése nélkül (a már kiírt eredményszöveg a régi nyelven marad, a következő szimulációtól az újon jelenik meg). A választás a felhasználó könyvtárában a `.gladiatus_sim_lang` fájlban megmarad. A szövegek a `gladiatus_sim/i18n.py` katalógusban vannak.
 
 A **Simulate battle** gomb lefuttatja a szimulációt és kiírja az eredményt.

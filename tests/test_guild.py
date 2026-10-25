@@ -153,3 +153,11 @@ def test_adaptive_delay_speeds_up_after_successes():
     for _ in range(60):
         c._good()
     assert c.delay < 0.5 and c.delay >= 0.1
+
+
+def test_guild_report_html():
+    from gladiatus_sim.gui_logic import GuildSide, run_guild
+    fs = lambda tag, d: [Fighter(name=f"{tag}{i}", level=50, life=1000, skill=100, agility=100, charisma=50,
+                                 intelligence=50, armor=100, damage=(d, d + 20)) for i in range(3)]
+    text, html = run_guild(GuildSide("Red", "1", fs("r", 80)), GuildSide("Blue<x>", "2", fs("b", 10)[:2]), 1, seed=1)
+    assert "&#128077;" in html and "Blue&lt;x&gt;" in html and "<table>" in html and "r0" in html

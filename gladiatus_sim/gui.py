@@ -1,9 +1,12 @@
 """Grafikus felület (Tkinter): játékosnév + szerver -> statok -> szimuláció."""
 from __future__ import annotations
 
+import os
 import queue
+import tempfile
 import threading
 import tkinter as tk
+import webbrowser
 from tkinter import ttk
 
 from . import gui_logic as gl
@@ -185,6 +188,9 @@ class App(ttk.Frame):
         self.table.grid(row=0, column=0, sticky="nsew")
         self.btn_sim = self._lbl(ttk.Button(mid, command=self.simulate, state="disabled"), "simulate")
         self.btn_sim.grid(row=1, column=0, sticky="ew", pady=(6, 0))
+        self.report_html = None
+        self.btn_report = self._lbl(ttk.Button(mid, command=self._open_report, state="disabled"), "btn_report")
+        self.btn_report.grid(row=2, column=0, sticky="ew", pady=(4, 0))
 
     def _build_result(self):
         f = self._lbl(ttk.LabelFrame(self, padding=4), "result")
@@ -370,8 +376,29 @@ class App(ttk.Frame):
         self._busy(True, t("st_running", runs=runs))
         mode, a, d = self.mode, self.team_a, self.team_d
         life_mode = "full" if self.v_full_life.get() else "current"
+        if mode == "guild":
+            self._run_thread(lambda: gl.run_guild(a, d, runs, life_mode=life_mode), self._guild_done)
+            return
         self._run_thread(lambda: gl.run_simulation(mode, a, d, runs, TurmaRules(), life_mode=life_mode),
                          self._sim_done)
+
+    def _guild_done(self, res, err):
+        if err is not None:
+            return self._sim_done(None, err)
+        text, html = res
+        self.report_html = html
+        self.btn_report.configure(state="normal")
+        self._sim_done(text, None)
+        self._open_report()
+
+    def _open_report(self):
+        """The report as an HTML page (like the game's own guild battle report) in the browser."""
+        if not self.report_html:
+            return
+        path = os.path.join(tempfile.gettempdir(), "gladiatus_guild_report.html")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(self.report_html)
+        webbrowser.open("file://" + path.replace(os.sep, "/") if os.sep == "/" else "file:///" + path.replace(os.sep, "/"))
 
     def _sim_done(self, text, err):
         if err is not None:
