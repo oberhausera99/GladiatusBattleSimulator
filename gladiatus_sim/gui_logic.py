@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from .arena import simulate_arena
 from .fetch import (Client, FetchError, fetch_arena_fighter, fetch_arena_fighter_by_id,
-                    fetch_guild_members, fetch_turma_team, parse_player_spec, search_guild)
+                    fetch_guild_info, fetch_guild_members, fetch_turma_team, parse_player_spec, search_guild)
 from .guild import simulate_guild
 from .fighter import Fighter
 from .turma import TurmaRules, normalize_team, simulate_turma
@@ -66,7 +66,11 @@ class GuildSide:
     name: str
     gid: str
     fighters: List[Fighter]
-    failed: List[str] = field(default_factory=list)      # members whose page could not be read
+    failed: List[str] = field(default_factory=list)      # "name: reason" of unreadable members
+    listed: int = 0                                      # members found on the member list
+    expected: int = 0                                    # member count shown on the guild page
+    full_name: str = ""
+    suspicious: List[str] = field(default_factory=list)  # loaded, but with implausible values
 
 
 def fetch_guild_side(name: str, server: str, client: Optional[Client] = None, progress=None,
@@ -76,36 +80,51 @@ def fetch_guild_side(name: str, server: str, client: Optional[Client] = None, pr
     n, country, srv = split_player(name, server)       # same 'name@server' splitting
     gid, gname = search_guild(client, country, srv, n)
     members = fetch_guild_members(client, country, srv, gid)
+    full_name, expected = fetch_guild_info(client, country, srv, gid)
     client.delay = min(client.delay, 0.1)           # polite, but several requests in flight
     done = [0]
+    reasons = {}
 
     def load(m):
-        try:
-            f = fetch_arena_fighter_by_id(client, m.pid, country, srv, name=m.name)
-            if not f.level and m.level:
-                f.level = m.level
-            return f
-        except FetchError:
-            return None
-        finally:
-            done[0] += 1
-            if progress:
-                progress(f"{gname}: tagok letöltése {done[0]}/{len(members)}")
+        last = None
+        for attempt in range(3):
+            try:
+                f = fetch_arena_fighter_by_id(client, m.pid, country, srv, name=m.name)
+                if not f.level and m.level:
+                    f.level = m.level
+                return f
+            except Exception as e:                  # noqa: BLE001 - reported per member
+                last = e
+                time.sleep(0.4 * (attempt + 1))
+        reasons[m.pid] = f"{type(last).__name__}: {last}"[:120]
+        return None
+
+    def load_progress(m):
+        f = load(m)
+        done[0] += 1
+        if progress:
+            progress(f"{gname}: tagok letöltése {done[0]}/{len(members)}")
+        return f
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        loaded = list(ex.map(load, members))               # keeps the member order
+        loaded = list(ex.map(load_progress, members))      # keeps the member order
     fighters = [f for f in loaded if f is not None]
-    failed = [m.name for m, f in zip(members, loaded) if f is None]
+    failed = [f"{m.name}: {reasons.get(m.pid, '?')}" for m, f in zip(members, loaded) if f is None]
+    suspicious = [f"{f.name} (L{f.level}, élet {f.life:.0f}, sebzés {f.damage[0]:.0f}-{f.damage[1]:.0f})"
+                  for f in fighters if f.life <= 0 or f.damage[1] <= 0 or f.skill <= 0 or f.level <= 0]
     if not fighters:
-        raise FetchError(f"{gname}: egyik tag adatlapját sem sikerült beolvasni")
-    return GuildSide(gname, gid, fighters, failed)
+        raise FetchError(f"{gname}: egyik tag adatlapját sem sikerült beolvasni "
+                         f"({failed[0] if failed else 'nincs tag'})")
+    side = GuildSide(gname, gid, fighters, failed, len(members), expected, full_name or "", suspicious)
+    return side
+
 
 
 def fetch_players(mode: str, att: Tuple[str, str], dfd: Tuple[str, str],
-                  client: Optional[Client] = None, progress=None):
+                  client: Optional[Client] = None, progress=None, debug_dir: Optional[str] = None):
     """Download both players. `att`/`dfd` are (name, server). Returns (a, d):
     single Fighters in arena mode, lists (idle mercs included) in turma mode."""
-    client = client or Client()
+    client = client or Client(debug_dir=debug_dir)
     if mode == "guild":
         return (fetch_guild_side(att[0], att[1], client, progress),
                 fetch_guild_side(dfd[0], dfd[1], client, progress))
@@ -169,6 +188,26 @@ def _guild_text(a: "GuildSide", d: "GuildSide", runs: int, seed: Optional[int]) 
             note = " (döntetlen, a védő nyer)" if p.drawn else ""
             lines.append(f"  {p.attacker} vs {p.defender}: nyertes {win}{note}, +{p.points} pont "
                          f"(pontszám {p.score_attacker:.0f} - {p.score_defender:.0f}, {p.rounds} kör)")
-    if a.failed or d.failed:
-        lines += ["", f"Nem sikerült beolvasni (kihagyva): {', '.join(a.failed + d.failed)}"]
+    lines += ["", "Adatbeolvasás:"]
+    for g in (a, d):
+        exp = f" / oldal szerint {g.expected}" if g.expected else ""
+        full = f" [{g.full_name}]" if g.full_name else ""
+        lines.append(f"  {g.name}{full}: lista {g.listed} tag{exp}, beolvasva {len(g.fighters)}, hibás {len(g.failed)}")
+        for x in g.failed[:15]:
+            lines.append(f"    ! nem olvasható: {x}")
+        for x in g.suspicious[:15]:
+            lines.append(f"    ? gyanús adat: {x}")
     return "\n".join(lines)
+
+
+def guild_summary(a: "GuildSide", d: "GuildSide") -> str:
+    """One status line about how complete the download was."""
+    parts = []
+    for g in (a, d):
+        t = f"{g.name}: {len(g.fighters)}/{g.listed} tag"
+        if g.expected and g.listed < g.expected:
+            t += f" (az oldal szerint {g.expected} tag, a lista csak {g.listed}-et tartalmaz!)"
+        if g.failed:
+            t += f", {len(g.failed)} nem olvasható"
+        parts.append(t)
+    return "Statok letöltve. " + " | ".join(parts)

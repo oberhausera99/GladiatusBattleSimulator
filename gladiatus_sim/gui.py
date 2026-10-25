@@ -57,6 +57,9 @@ class App(ttk.Frame):
         ttk.Spinbox(f, from_=10, to=100000, increment=100, textvariable=self.v_runs, width=8).grid(row=0, column=6)
         self.btn_get = ttk.Button(f, text="Get stats", command=self.get_stats)
         self.btn_get.grid(row=1, column=5, columnspan=2, sticky="ew", padx=(14, 0))
+        self.v_debug = tk.BooleanVar(value=False)
+        ttk.Checkbutton(f, text="Letöltött lapok mentése (debug_pages mappába)",
+                        variable=self.v_debug).grid(row=2, column=1, columnspan=5, sticky="w", padx=(14, 0))
         self.v_status = tk.StringVar(value="Add meg a két játékost, majd kattints a Get stats gombra.")
         ttk.Label(self, textvariable=self.v_status, foreground="#555").grid(row=1, column=0, sticky="w", pady=(4, 4))
 
@@ -137,11 +140,13 @@ class App(ttk.Frame):
             self.v_status.set("Mindkét játékos nevét add meg.")
             return
         self._busy(True, "Statok letöltése...")
+        debug = self.v_debug.get()
 
         def progress(msg):
             self.q.put((lambda r, e, m=msg: self.v_status.set(m), None, None))
 
-        self._run_thread(lambda: gl.fetch_players(mode, att, dfd, progress=progress),
+        self._run_thread(lambda: gl.fetch_players(mode, att, dfd, progress=progress,
+                                                      debug_dir="debug_pages" if debug else None),
                          lambda r, e: self._got_stats(mode, r, e))
 
     def _got_stats(self, mode, res, err):
@@ -163,6 +168,9 @@ class App(ttk.Frame):
             self.lists[side][0].configure(height=14 if mode == "guild" else 6)
         self._on_select_sync()
         self._refresh_table()
+        if mode == "guild":
+            self._busy(False, gl.guild_summary(self.team_a, self.team_d))
+            return
         self._busy(False, "Statok letöltve. Állítsd be a szerepeket, majd kattints a Simulate battle gombra."
                    if mode == "turma" else "Statok letöltve. Kattints a Simulate battle gombra.")
 

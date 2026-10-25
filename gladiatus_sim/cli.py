@@ -107,6 +107,29 @@ def cmd_fight(args) -> int:
     return 0
 
 
+def cmd_guild_check(args) -> int:
+    from .gui_logic import fetch_guild_side
+    from .fetch import Client
+    name, server = args.guild.rsplit("@", 1)
+    client = Client(debug_dir=args.save_html)
+    try:
+        g = fetch_guild_side(name, server, client, progress=lambda m: print(m, end="\r", file=sys.stderr))
+    except FetchError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    print(f"\n{g.name} (id {g.gid}) full name: {g.full_name or '?'}  listed {g.listed}  "
+          f"page says {g.expected}  loaded {len(g.fighters)}  failed {len(g.failed)}")
+    print(f"{'name':24s} lvl   life   skill  agil   char   int    armor  dmg")
+    for f in g.fighters:
+        print(f"{f.name[:24]:24s} {f.level:3d} {f.life:7.0f} {f.skill:6.0f} {f.agility:6.0f} {f.charisma:6.0f} "
+              f"{f.intelligence:6.0f} {f.armor:7.0f} {f.damage[0]:.0f}-{f.damage[1]:.0f}")
+    for x in g.failed:
+        print("FAILED:", x)
+    for x in g.suspicious:
+        print("SUSPICIOUS:", x)
+    return 0
+
+
 def cmd_show(args) -> int:
     """Download a player and print the stats as JSON (usable as simulator input)."""
     client = _client(args)
@@ -150,6 +173,10 @@ def main(argv=None) -> int:
     fp.set_defaults(fn=cmd_fight)
     gp = sub.add_parser("gui", help="open the graphical interface")
     gp.set_defaults(fn=lambda args: __import__("gladiatus_sim.gui", fromlist=["main"]).main())
+    cp = sub.add_parser("guild-check", help="download a guild and print every member's parsed stats")
+    cp.add_argument("guild", help="[TAG]@s51-en or 2562@s51-en")
+    cp.add_argument("--save-html", metavar="DIR", help="save the downloaded pages")
+    cp.set_defaults(fn=cmd_guild_check)
     sp2 = sub.add_parser("show", help="download one player and print JSON")
     sp2.add_argument("mode", choices=["arena", "turma"])
     sp2.add_argument("player", help="NAME@SERVER, e.g. Aveloca@s59-en")

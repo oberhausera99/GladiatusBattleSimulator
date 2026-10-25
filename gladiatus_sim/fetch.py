@@ -383,19 +383,39 @@ def search_guild(client: Client, country: str, server: str, name: str):
 
 
 def parse_member_list(html: str) -> List[GuildMember]:
-    rows = re.findall(
-        r'<tr>\s*<td>\s*<a\s+href="index\.php\?mod=player&(?:amp;)?p=(\d+)[^"]*">\s*([^<]+?)\s*</a>'
-        r'\s*</td>\s*<td>\s*([^<]*?)\s*</td>\s*<td>\s*(\d+)\s*</td>', html)
-    members = [GuildMember(pid, htmllib.unescape(name), htmllib.unescape(rank), int(level))
-               for pid, name, rank, level in rows]
-    if not members:      # layout fallback: only the player links
-        seen = set()
-        for pid, name in re.findall(
-                r'<a\s+href="index\.php\?mod=player&(?:amp;)?p=(\d+)[^"]*">\s*([^<]+?)\s*</a>', html):
-            if pid not in seen:
-                seen.add(pid)
-                members.append(GuildMember(pid, htmllib.unescape(name)))
+    """All members of a member-list page. Rows with rank/level are read precisely, any
+    other player link on the page is still picked up (with unknown rank/level)."""
+    members: List[GuildMember] = []
+    seen = set()
+    for pid, name, rank, level in re.findall(
+            r'<tr>\s*<td>\s*<a\s+href="index\.php\?mod=player&(?:amp;)?p=(\d+)[^"]*">\s*([^<]+?)\s*</a>'
+            r'\s*</td>\s*<td>\s*([^<]*?)\s*</td>\s*<td>\s*(\d+)\s*</td>', html):
+        if pid not in seen:
+            seen.add(pid)
+            members.append(GuildMember(pid, htmllib.unescape(name), htmllib.unescape(rank), int(level)))
+    for pid, name in re.findall(
+            r'<a\s+href="index\.php\?mod=player&(?:amp;)?p=(\d+)[^"]*">\s*([^<]+?)\s*</a>', html):
+        if pid not in seen:
+            seen.add(pid)
+            members.append(GuildMember(pid, htmllib.unescape(name)))
     return members
+
+
+def parse_member_total(html: str) -> int:
+    """'128 / 129 Members' on the guild page: the number of members (first number)."""
+    m = re.search(r"(\d+)\s*/\s*(\d+)\s*(?:Tagok|Members|Mitglieder|Miembros|Membres|Membri)", html)
+    return int(m.group(1)) if m else 0
+
+
+def fetch_guild_info(client: Client, country: str, server: str, gid: str):
+    """(full name, member count) from the guild's public page; (None, 0) when unreadable."""
+    try:
+        html = client.request(client.url(
+            country, server, f"mod=guild&submod=forumGladiatorius&i={gid}&sh={EMPTY_SH}"))
+    except FetchError:
+        return None, 0
+    m = re.search(r"<td[^>]*>\s*(?:N[eé]v|Name)\s*</td>\s*<td[^>]*>\s*([^<]+?)\s*</td>", html)
+    return (htmllib.unescape(m.group(1)) if m else None), parse_member_total(html)
 
 
 def fetch_guild_members(client: Client, country: str, server: str, gid: str) -> List[GuildMember]:
