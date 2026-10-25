@@ -88,3 +88,12 @@ def test_tournament_turma_mode():
     teams = [team(k) for k in range(5)]
     top = tournament(teams, samples=4, finalists=4, final_samples=20, seed=1, top=2, mode="turma")
     assert top[0].team[0].name == "m4" and top[0].fighter is top[0].team[0]
+
+
+def test_interleave_and_per_server_pacing():
+    from gladiatus_sim.bestplayer import interleave
+    cs = [Candidate(str(i), f"n{i}", 140, srv) for srv in ("1", "2") for i in range(3)]
+    assert [c.server for c in interleave(cs)] == ["1", "2"] * 3
+    c = Client(base="http://x", delay=0.01)
+    c._back_off(0, "1", host="a")
+    assert c._pace("a").delay > c._pace("b").delay and c._pace("b").next == 0.0

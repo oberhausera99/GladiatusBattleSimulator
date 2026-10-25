@@ -59,22 +59,28 @@ def parse_player_spec(spec: str) -> Tuple[str, str, str]:
 
 
 # -------------------------------------------------------------------- client
+class _Pace:
+    def __init__(self, delay: float) -> None:
+        self.delay = delay
+        self.next = 0.0
+        self.streak = 0
+
+
 class Client:
     def __init__(self, base: str = DEFAULT_BASE, delay: float = 0.3,
                  timeout: float = 20, debug_dir: Optional[str] = None,
                  cache_dir: Optional[str] = None, cache_ttl: float = 600.0,
                  min_delay: float = 0.08) -> None:
         self.base = base
-        self.delay = delay
+        self._lock = threading.Lock()
+        self._default = _Pace(delay)
+        self._paces = {}
         self.min_delay = min_delay          # the adaptive rate never goes below this
         self.cache_dir = cache_dir          # on-disk page cache (gzip), for GET requests only
         self.cache_ttl = cache_ttl
-        self._ok_streak = 0
         self.timeout = timeout
         self.debug_dir = debug_dir
         self._cache = {}
-        self._next = 0.0
-        self._lock = threading.Lock()
 
     def url(self, country: str, server: str, query: str) -> str:
         root = self.base.format(country=country, server=server)
@@ -95,34 +101,59 @@ class Client:
                 raw = zlib.decompress(raw, -zlib.MAX_WBITS)
         return raw.decode("utf-8", errors="replace")
 
-    def _good(self) -> None:
-        """AIMD: every 15 requests in a row without a 503 the pause shrinks a bit."""
+    # Pacing is kept per game server (host): every server throttles on its own, so requests to
+    # different servers never wait for each other.
+    def _pace(self, host: Optional[str] = None) -> "_Pace":
         with self._lock:
-            self._ok_streak += 1
-            if self._ok_streak >= 15:
-                self._ok_streak = 0
-                self.delay = max(self.min_delay, self.delay * 0.85)
+            if host is None:
+                return self._default
+            p = self._paces.get(host)
+            if p is None:
+                p = self._paces[host] = _Pace(self._default.delay)
+            return p
 
-    def _back_off(self, attempt: int, retry_after, slow_down: bool = True) -> None:
-        """The game answers 503/429 when it is asked too fast: pause every thread and
-        permanently slow the request rate down a little."""
+    @property
+    def delay(self) -> float:
+        return self._default.delay
+
+    @delay.setter
+    def delay(self, value: float) -> None:
+        self._default.delay = value
+        for p in self._paces.values():
+            p.delay = min(p.delay, value)
+
+    def _good(self, host: Optional[str] = None) -> None:
+        """AIMD: every 15 requests in a row without a 503 the pause shrinks a bit."""
+        p = self._pace(host)
+        with self._lock:
+            p.streak += 1
+            if p.streak >= 15:
+                p.streak = 0
+                p.delay = max(self.min_delay, p.delay * 0.85)
+
+    def _back_off(self, attempt: int, retry_after, slow_down: bool = True,
+                  host: Optional[str] = None) -> None:
+        """The game answers 503/429 when it is asked too fast: pause the threads talking to that
+        server and permanently slow the request rate towards it down a little."""
         try:
             pause = float(retry_after)
         except (TypeError, ValueError):
             pause = 1.5 * 2 ** attempt
         pause = min(pause, 30.0)
+        p = self._pace(host)
         with self._lock:
-            self._ok_streak = 0
-            self._next = max(self._next, time.time() + pause)
+            p.streak = 0
+            p.next = max(p.next, time.time() + pause)
             if slow_down:
-                self.delay = min(max(self.delay, 0.1) * 1.5, 2.0)
+                p.delay = min(max(p.delay, 0.1) * 1.5, 2.0)
 
-    def _wait(self) -> None:
-        """Global request spacing, safe to call from several threads."""
+    def _wait(self, host: Optional[str] = None) -> None:
+        """Request spacing per server, safe to call from several threads."""
+        p = self._pace(host)
         with self._lock:
             now = time.time()
-            start = max(now, self._next)
-            self._next = start + self.delay
+            start = max(now, p.next)
+            p.next = start + p.delay
         if start > now:
             time.sleep(start - now)
 
@@ -142,8 +173,9 @@ class Client:
         body = urllib.parse.urlencode(data).encode() if data is not None else None
         text = None
         last: Optional[Exception] = None
+        host = urllib.parse.urlsplit(url).netloc
         for attempt in range(6):
-            self._wait()
+            self._wait(host)
             req = urllib.request.Request(url, data=body, headers={
                 "User-Agent": USER_AGENT, "Accept-Encoding": "gzip, deflate"})
             try:
@@ -151,16 +183,16 @@ class Client:
                     raw = r.read()
                     enc = (getattr(r, "headers", None) or {}).get("Content-Encoding", "") or ""
                 text = self._decode(raw, enc)
-                self._good()
+                self._good(host)
                 break
             except urllib.error.HTTPError as e:
                 last = e
                 if e.code not in (429, 500, 502, 503, 504):
                     break
-                self._back_off(attempt, e.headers.get("Retry-After") if e.headers else None)
+                self._back_off(attempt, e.headers.get("Retry-After") if e.headers else None, host=host)
             except (urllib.error.URLError, OSError) as e:
                 last = e
-                self._back_off(attempt, None, slow_down=False)
+                self._back_off(attempt, None, slow_down=False, host=host)
         if text is None:
             raise FetchError(f"request failed for {url}: {last}") from last
         if disk:

@@ -244,8 +244,24 @@ def collect_candidates(client: Client, servers: Sequence[str], country: str, lev
     return result, errors
 
 
+def interleave(cands: Sequence[Candidate]) -> List[Candidate]:
+    """Round-robin over the servers so that parallel workers talk to different servers (each
+    server throttles on its own) instead of queueing up on one."""
+    by: Dict[str, List[Candidate]] = {}
+    for c in cands:
+        by.setdefault(f"{c.server}-{c.country}", []).append(c)
+    out: List[Candidate] = []
+    queues = list(by.values())
+    k = 0
+    while queues:
+        queues = [q for q in queues if k < len(q)]
+        out += [q[k] for q in queues]
+        k += 1
+    return out
+
+
 def load_fighters(client: Client, cands: Sequence[Candidate], progress: Optional[Callable] = None,
-                  workers: int = 8) -> Tuple[List[Fighter], List[str]]:
+                  workers: int = 24) -> Tuple[List[Fighter], List[str]]:
     done = [0]
     failed: List[str] = []
 
@@ -264,12 +280,12 @@ def load_fighters(client: Client, cands: Sequence[Candidate], progress: Optional
                 progress(f"Játékosok letöltése: {done[0]}/{len(cands)}")
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        loaded = list(ex.map(one, cands))
+        loaded = list(ex.map(one, interleave(cands)))
     return [f for f in loaded if f is not None], failed
 
 
 def load_teams(client: Client, cands: Sequence[Candidate], progress: Optional[Callable] = None,
-               workers: int = 8) -> Tuple[List[List[Fighter]], List[str]]:
+               workers: int = 24) -> Tuple[List[List[Fighter]], List[str]]:
     """Turma teams (main character + mercenaries with their roles) of the candidates."""
     done = [0]
     failed: List[str] = []
@@ -289,7 +305,7 @@ def load_teams(client: Client, cands: Sequence[Candidate], progress: Optional[Ca
                 progress(f"Csapatok letöltése: {done[0]}/{len(cands)}")
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        loaded = list(ex.map(one, cands))
+        loaded = list(ex.map(one, interleave(cands)))
     return [t for t in loaded if t], failed
 
 

@@ -118,7 +118,7 @@ def test_503_is_retried_and_slows_the_client_down(monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
     c = Client(base="http://x", delay=0.01)
     assert c.request("http://x/a") == "<html>ok</html>"
-    assert len(calls) == 3 and c.delay > 0.01
+    assert len(calls) == 3 and c._pace('x').delay > 0.01
 
 
 def test_gzip_and_disk_cache(monkeypatch, tmp_path):
