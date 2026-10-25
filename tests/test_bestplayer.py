@@ -34,7 +34,7 @@ def mk(name, dmg):
 
 def test_tournament_puts_the_strongest_first():
     fs = [mk(f"p{i}", 600 + 40 * i) for i in range(12)]
-    top = tournament(fs, opponents=6, samples=4, finalists=6, final_samples=20, seed=1, top=3)
+    top = tournament(fs, samples=4, finalists=6, final_samples=20, seed=1, top=3)
     assert top[0].fighter.name == "p11" and len(top) == 3
     assert top[0].final >= top[1].final >= top[2].final
 
@@ -49,8 +49,29 @@ def test_crawl_and_full_flow_on_fake_server():
         c = Client(base=base, delay=0)
         cands = crawl_server(c, "en", "1", 130, 150)
         assert [x.name for x in cands] == ["B", "C", "D", "E"]       # follows page links, filters the level
-        b = gl.fetch_best_set(130, 150, "1", 10, client=Client(base=base, delay=0))
-        text = gl.best_text(b, opponents=3, samples=2, seed=1)
+        b = gl.fetch_best_set(130, 150, "1", client=Client(base=base, delay=0))
+        text = gl.best_text(b, samples=2, seed=1)
         assert "Legjobb játékosok" in text and "1  " in text
     finally:
         srv.shutdown()
+
+
+def test_lobby_json_and_budgeted_tournament():
+    from gladiatus_sim.bestplayer import _servers_from_json
+    js = '[{"language":"en","number":3},{"language":"hu","number":9},{"language":"en","number":1}]'
+    assert _servers_from_json(js, "en") == ["1", "3"]
+    # a tiny budget forces the random-subset stage, but the result is still sane
+    fs = [mk(f"p{i}", 600 + 40 * i) for i in range(30)]
+    top = tournament(fs, samples=2, finalists=6, final_samples=10, seed=2, top=3, battle_budget=300)
+    assert top[0].fighter.level == 140 and len(top) == 3
+
+
+def test_discovery_falls_back_to_probing(monkeypatch):
+    import gladiatus_sim.bestplayer as bp
+    monkeypatch.setattr(bp, "LOBBY_APIS", ())
+    monkeypatch.setattr(bp.socket, "getaddrinfo", lambda host, port: (_ for _ in ()).throw(OSError()) if "s3-" not in host and "s5-" not in host else [1])
+    class C:
+        base = "https://s{server}-{country}.gladiatus.x"
+        def url(self, c, s, q): return f"u{s}"
+        def request(self, u): return "<html>highscore mod=player</html>"
+    assert bp.discover_servers(C(), "en", max_number=8) == ["3", "5"]

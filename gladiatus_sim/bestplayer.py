@@ -7,8 +7,10 @@ follows the pages' own links and finds the level column by its header; see ``par
 from __future__ import annotations
 
 import html as htmllib
+import json
 import random
 import re
+import socket
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
@@ -31,6 +33,79 @@ class Candidate:
     @property
     def label(self) -> str:
         return f"{self.name}@s{self.server}-{self.country}"
+
+
+LOBBY_APIS = (
+    "https://lobby.gladiatus.gameforge.com/api/servers",
+    "https://lobby.gameforge.com/api/servers",
+)
+
+
+def _servers_from_json(text: str, country: str) -> List[str]:
+    """Server numbers of a country from a lobby-style JSON list (several shapes tolerated)."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return []
+    out: List[str] = []
+    for item in data if isinstance(data, list) else []:
+        if not isinstance(item, dict):
+            continue
+        lang = str(item.get("language") or item.get("lang") or item.get("country") or "").lower()
+        game = str(item.get("gameEnvironmentId") or item.get("game") or "gladiatus").lower()
+        num = item.get("number") or item.get("server") or item.get("id")
+        if lang in (country, "") and "gladiatus" in game or lang == country:
+            if str(num).isdigit():
+                out.append(str(num))
+    return sorted(set(out), key=int)
+
+
+def discover_servers(client: Client, country: str = "en", max_number: int = 300,
+                     progress: Optional[Callable] = None) -> List[str]:
+    """Every existing server of a country, found dynamically.
+
+    1. The public lobby server list is tried (JSON).
+    2. Otherwise the host names ``s<N>-<country>.gladiatus.gameforge.com`` are probed: names that
+       resolve in DNS are then checked with one request to the game.
+    """
+    for url in LOBBY_APIS:
+        try:
+            found = _servers_from_json(client.request(url), country)
+        except FetchError:
+            continue
+        if found:
+            return found
+    root = client.base
+
+    def resolves(n: int) -> bool:
+        host = re.sub(r"^https?://", "", root.format(country=country, server=n)).split("/")[0]
+        try:
+            socket.getaddrinfo(host, 443)
+            return True
+        except OSError:
+            return False
+
+    with ThreadPoolExecutor(max_workers=32) as ex:
+        cands = [n for n, ok in zip(range(1, max_number + 1), ex.map(resolves, range(1, max_number + 1))) if ok]
+    alive: List[str] = []
+    done = [0]
+
+    def alive_check(n: int) -> bool:
+        try:
+            html = client.request(client.url(country, str(n), "mod=highscore"))
+            return "mod=player" in html or "highscore" in html
+        except FetchError:
+            return False
+        finally:
+            done[0] += 1
+            if progress:
+                progress(f"Szerverek keresése: {done[0]}/{len(cands)}")
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        for n, ok in zip(cands, ex.map(alive_check, cands)):
+            if ok:
+                alive.append(str(n))
+    return alive
 
 
 def parse_server_range(text: str) -> List[str]:
@@ -112,7 +187,7 @@ def _page_key(href: str) -> str:
 
 
 def crawl_server(client: Client, country: str, server: str, level_min: int, level_max: int,
-                 max_players: int = 40, max_pages: int = 60) -> List[Candidate]:
+                 max_players: int = 10 ** 9, max_pages: int = 2000) -> List[Candidate]:
     """Walk the highscore pages of a server and collect players of the level interval."""
     queue = ["index.php?mod=highscore"]
     visited = set()
@@ -140,7 +215,7 @@ def crawl_server(client: Client, country: str, server: str, level_min: int, leve
 
 
 def collect_candidates(client: Client, servers: Sequence[str], country: str, level_min: int,
-                       level_max: int, per_server: int, progress: Optional[Callable] = None,
+                       level_max: int, per_server: int = 10 ** 9, progress: Optional[Callable] = None,
                        workers: int = 4) -> Tuple[List[Candidate], Dict[str, str]]:
     """Candidates from all servers (errors per server are returned, not raised)."""
     errors: Dict[str, str] = {}
@@ -209,30 +284,46 @@ def _duel(a: Fighter, b: Fighter, rng: random.Random, n: int, life_mode: str) ->
     return w
 
 
-def tournament(fighters: Sequence[Fighter], opponents: int = 25, samples: int = 4,
-               finalists: int = 16, final_samples: int = 100, seed: Optional[int] = None,
-               life_mode: str = "full", top: int = 5,
+def tournament(fighters: Sequence[Fighter], samples: int = 2, finalists: int = 16,
+               final_samples: int = 100, seed: Optional[int] = None, life_mode: str = "full",
+               top: int = 5, battle_budget: int = 4_000_000,
                progress: Optional[Callable] = None) -> List[Ranking]:
-    """Stage 1: everybody fights `opponents` random others `samples` times. Stage 2: the best
-    `finalists` fight a round robin (`final_samples` battles per pair). Returns the best `top`."""
+    """Stage 1: everybody fights everybody (``samples`` battles per pair) as long as that fits into
+    ``battle_budget`` battles; with more players each fights a random subset of the others.
+    Stage 2: the best ``finalists`` fight a round robin (``final_samples`` per pair).
+    Returns the best ``top`` players."""
     rng = random.Random(seed)
     fs = list(fighters)
     n = len(fs)
     if n < 2:
         raise ValueError("at least two players are needed")
+    samples = max(1, samples)
+    pairs_total = n * (n - 1) // 2
+    per_pair = samples
+    if pairs_total * per_pair > battle_budget:
+        per_pair = 1
     wins = [0.0] * n
     games = [0] * n
-    for i in range(n):
-        others = [j for j in range(n) if j != i]
-        pick = others if len(others) <= opponents else rng.sample(others, opponents)
-        for j in pick:
-            w = _duel(fs[i], fs[j], rng, samples, life_mode)
-            wins[i] += w
-            games[i] += samples
-            wins[j] += samples - w
-            games[j] += samples
-        if progress and i % 10 == 0:
+    if pairs_total * per_pair <= battle_budget:
+        plan = ((i, j) for i in range(n) for j in range(i + 1, n))           # everybody vs everybody
+    else:
+        k = max(1, battle_budget // (n * per_pair) // 1)
+
+        def sampled():
+            for i in range(n):
+                for j in rng.sample([x for x in range(n) if x != i], min(k, n - 1)):
+                    yield i, j
+        plan = sampled()
+    last = -1
+    for i, j in plan:
+        w = _duel(fs[i], fs[j], rng, per_pair, life_mode)
+        wins[i] += w
+        wins[j] += per_pair - w
+        games[i] += per_pair
+        games[j] += per_pair
+        if progress and i != last and i % 25 == 0:
             progress(f"Selejtező: {i + 1}/{n}")
+            last = i
     rate1 = [100 * wins[i] / games[i] if games[i] else 0.0 for i in range(n)]
     order = sorted(range(n), key=lambda i: -rate1[i])[:max(2, min(finalists, n))]
     fw = {i: 0.0 for i in order}

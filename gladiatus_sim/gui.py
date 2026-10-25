@@ -75,12 +75,10 @@ class App(ttk.Frame):
         bf = ttk.Frame(f)
         self.best_frame = bf
         self.v_best = {k: tk.StringVar(value=v) for k, v in
-                       (("lo", "130"), ("hi", "150"), ("servers", "1-30"), ("per", "30"),
-                        ("opp", "25"), ("samples", "4"))}
+                       (("lo", "130"), ("hi", "150"), ("servers", ""), ("samples", "2"))}
         for i, (lab, key, w) in enumerate((("Szint tól:", "lo", 5), ("ig:", "hi", 5),
-                                           ("EN szerverek (pl. 1-60):", "servers", 12),
-                                           ("Max játékos / szerver:", "per", 5),
-                                           ("Ellenfél / játékos:", "opp", 5), ("Csata / páros:", "samples", 5))):
+                                           ("Szerverek (üres = az összes EN):", "servers", 10),
+                                           ("Csata / páros:", "samples", 4))):
             ttk.Label(bf, text=lab).grid(row=0, column=2 * i, padx=(8, 2), sticky="e")
             ttk.Entry(bf, textvariable=self.v_best[key], width=w).grid(row=0, column=2 * i + 1)
         bf.grid(row=4, column=1, columnspan=6, sticky="w", pady=(6, 0))
@@ -190,7 +188,7 @@ class App(ttk.Frame):
 
     def _get_best(self):
         try:
-            lo, hi, per = self._int("lo"), self._int("hi"), max(1, self._int("per"))
+            lo, hi = self._int("lo"), self._int("hi")
         except ValueError as e:
             self.v_status.set(str(e))
             return
@@ -201,7 +199,7 @@ class App(ttk.Frame):
             self.q.put((lambda r, e, m=msg: self.v_status.set(m), None, None))
 
         def work():
-            b = gl.fetch_best_set(lo, hi, servers, per, progress=progress)
+            b = gl.fetch_best_set(lo, hi, servers, progress=progress)
             return b, b
 
         self._run_thread(work, lambda r, e: self._got_stats("best", r, e))
@@ -291,7 +289,7 @@ class App(ttk.Frame):
     def simulate(self):
         if self.mode == "best":
             try:
-                opp, samples = max(1, self._int("opp")), max(1, self._int("samples"))
+                samples = max(1, self._int("samples"))
             except ValueError as e:
                 self.v_status.set(str(e))
                 return
@@ -301,7 +299,7 @@ class App(ttk.Frame):
             def progress(msg):
                 self.q.put((lambda r, e, m=msg: self.v_status.set(m), None, None))
 
-            self._run_thread(lambda: gl.best_text(b, opp, samples, progress=progress), self._sim_done)
+            self._run_thread(lambda: gl.best_text(b, samples, progress=progress), self._sim_done)
             return
         try:
             runs = max(1, int(self.v_runs.get()))
