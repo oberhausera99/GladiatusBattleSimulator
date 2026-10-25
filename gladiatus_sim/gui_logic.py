@@ -18,6 +18,13 @@ ROLE_LABELS = {"tank": "tank (védő)", "dps": "támadó", "healer": "gyógyít�
 ROLE_FROM_LABEL = {v: k for k, v in ROLE_LABELS.items()}
 
 
+def cache_dir() -> str:
+    """Pages are cached on disk for 10 minutes (HP changes in battles, so not longer)."""
+    import os
+    import tempfile
+    return os.path.join(tempfile.gettempdir(), "gladiatus_sim_cache")
+
+
 def split_player(name: str, server: str) -> Tuple[str, str, str]:
     """('Name', 's51-en') -> (name, country, server)."""
     return parse_player_spec(f"{name.strip()}@{server.strip()}")
@@ -80,14 +87,14 @@ class GuildSide:
 
 
 def fetch_guild_side(name: str, server: str, client: Optional[Client] = None, progress=None,
-                     workers: int = 4) -> GuildSide:
+                     workers: int = 8) -> GuildSide:
     """Download a guild's member list and every member's arena character."""
     client = client or Client()
     n, country, srv = split_player(name, server)       # same 'name@server' splitting
     gid, gname = search_guild(client, country, srv, n)
     members = fetch_guild_members(client, country, srv, gid)
     full_name, expected = fetch_guild_info(client, country, srv, gid)
-    client.delay = max(client.delay, 0.25)          # the game answers 503 when asked too fast
+    client.delay = min(client.delay, 0.12)          # adaptive: it slows down by itself on 503
     done = [0]
     reasons = {}
 
@@ -133,10 +140,13 @@ def fetch_players(mode: str, att: Tuple[str, str], dfd: Tuple[str, str],
                   client: Optional[Client] = None, progress=None, debug_dir: Optional[str] = None):
     """Download both players. `att`/`dfd` are (name, server). Returns (a, d):
     single Fighters in arena mode, lists (idle mercs included) in turma mode."""
-    client = client or Client(debug_dir=debug_dir)
+    client = client or Client(debug_dir=debug_dir, cache_dir=cache_dir())
     if mode == "guild":
-        return (fetch_guild_side(att[0], att[1], client, progress),
-                fetch_guild_side(dfd[0], dfd[1], client, progress))
+        # both guilds at once; they share the client's global request spacing
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            fa = ex.submit(fetch_guild_side, att[0], att[1], client, progress)
+            fd = ex.submit(fetch_guild_side, dfd[0], dfd[1], client, progress)
+            return fa.result(), fd.result()
     out = []
     for name, server in (att, dfd):
         n, country, srv = split_player(name, server)

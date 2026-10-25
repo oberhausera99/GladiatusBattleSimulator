@@ -119,3 +119,37 @@ def test_503_is_retried_and_slows_the_client_down(monkeypatch):
     c = Client(base="http://x", delay=0.01)
     assert c.request("http://x/a") == "<html>ok</html>"
     assert len(calls) == 3 and c.delay > 0.01
+
+
+def test_gzip_and_disk_cache(monkeypatch, tmp_path):
+    import gzip
+    import io
+    import urllib.request
+    calls = []
+
+    class Resp(io.BytesIO):
+        headers = {"Content-Encoding": "gzip"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    def fake_urlopen(req, timeout=None):
+        calls.append(req.headers.get("Accept-encoding"))
+        return Resp(gzip.compress("<html>árvíztűrő</html>".encode()))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    c = Client(base="http://x", delay=0, cache_dir=str(tmp_path))
+    assert c.request("http://x/p") == "<html>árvíztűrő</html>"
+    assert "gzip" in calls[0]
+    c2 = Client(base="http://x", delay=0, cache_dir=str(tmp_path))      # new client: served from disk
+    assert c2.request("http://x/p") == "<html>árvíztűrő</html>" and len(calls) == 1
+
+
+def test_adaptive_delay_speeds_up_after_successes():
+    c = Client(base="http://x", delay=0.5, min_delay=0.1)
+    for _ in range(60):
+        c._good()
+    assert c.delay < 0.5 and c.delay >= 0.1

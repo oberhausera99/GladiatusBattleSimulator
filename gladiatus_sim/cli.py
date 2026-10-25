@@ -111,7 +111,8 @@ def cmd_guild_check(args) -> int:
     from .gui_logic import fetch_guild_side
     from .fetch import Client
     name, server = args.guild.rsplit("@", 1)
-    client = Client(debug_dir=args.save_html)
+    from .gui_logic import cache_dir
+    client = Client(debug_dir=args.save_html, cache_dir=cache_dir())
     try:
         g = fetch_guild_side(name, server, client, progress=lambda m: print(m, end="\r", file=sys.stderr))
     except FetchError as e:

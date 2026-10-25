@@ -11,6 +11,8 @@ HTML can break it. Use ``Client(debug_dir=...)`` to save the raw pages.
 """
 from __future__ import annotations
 
+import gzip
+import hashlib
 import html as htmllib
 import json
 import os
@@ -20,6 +22,7 @@ import urllib.error
 import urllib.parse
 import threading
 import urllib.request
+import zlib
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
@@ -58,9 +61,15 @@ def parse_player_spec(spec: str) -> Tuple[str, str, str]:
 # -------------------------------------------------------------------- client
 class Client:
     def __init__(self, base: str = DEFAULT_BASE, delay: float = 0.3,
-                 timeout: float = 20, debug_dir: Optional[str] = None) -> None:
+                 timeout: float = 20, debug_dir: Optional[str] = None,
+                 cache_dir: Optional[str] = None, cache_ttl: float = 600.0,
+                 min_delay: float = 0.08) -> None:
         self.base = base
         self.delay = delay
+        self.min_delay = min_delay          # the adaptive rate never goes below this
+        self.cache_dir = cache_dir          # on-disk page cache (gzip), for GET requests only
+        self.cache_ttl = cache_ttl
+        self._ok_streak = 0
         self.timeout = timeout
         self.debug_dir = debug_dir
         self._cache = {}
@@ -71,6 +80,29 @@ class Client:
         root = self.base.format(country=country, server=server)
         return f"{root}/game/index.php?{query}"
 
+    def _disk_path(self, url: str) -> str:
+        return os.path.join(self.cache_dir, hashlib.md5(url.encode()).hexdigest() + ".html.gz")
+
+    @staticmethod
+    def _decode(raw: bytes, encoding: str) -> str:
+        enc = encoding.lower()
+        if "gzip" in enc:
+            raw = gzip.decompress(raw)
+        elif "deflate" in enc:
+            try:
+                raw = zlib.decompress(raw)
+            except zlib.error:
+                raw = zlib.decompress(raw, -zlib.MAX_WBITS)
+        return raw.decode("utf-8", errors="replace")
+
+    def _good(self) -> None:
+        """AIMD: every 15 requests in a row without a 503 the pause shrinks a bit."""
+        with self._lock:
+            self._ok_streak += 1
+            if self._ok_streak >= 15:
+                self._ok_streak = 0
+                self.delay = max(self.min_delay, self.delay * 0.85)
+
     def _back_off(self, attempt: int, retry_after, slow_down: bool = True) -> None:
         """The game answers 503/429 when it is asked too fast: pause every thread and
         permanently slow the request rate down a little."""
@@ -80,6 +112,7 @@ class Client:
             pause = 1.5 * 2 ** attempt
         pause = min(pause, 30.0)
         with self._lock:
+            self._ok_streak = 0
             self._next = max(self._next, time.time() + pause)
             if slow_down:
                 self.delay = min(max(self.delay, 0.1) * 1.5, 2.0)
@@ -97,15 +130,28 @@ class Client:
         key = (url, json.dumps(data, sort_keys=True))
         if key in self._cache:
             return self._cache[key]
+        disk = self._disk_path(url) if (self.cache_dir and data is None) else None
+        if disk and os.path.exists(disk) and time.time() - os.path.getmtime(disk) < self.cache_ttl:
+            try:
+                with gzip.open(disk, "rt", encoding="utf-8") as fh:
+                    text = fh.read()
+                self._cache[key] = text
+                return text
+            except (OSError, EOFError):
+                pass
         body = urllib.parse.urlencode(data).encode() if data is not None else None
         text = None
         last: Optional[Exception] = None
         for attempt in range(6):
             self._wait()
-            req = urllib.request.Request(url, data=body, headers={"User-Agent": USER_AGENT})
+            req = urllib.request.Request(url, data=body, headers={
+                "User-Agent": USER_AGENT, "Accept-Encoding": "gzip, deflate"})
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout) as r:
-                    text = r.read().decode("utf-8", errors="replace")
+                    raw = r.read()
+                    enc = (getattr(r, "headers", None) or {}).get("Content-Encoding", "") or ""
+                text = self._decode(raw, enc)
+                self._good()
                 break
             except urllib.error.HTTPError as e:
                 last = e
@@ -117,6 +163,13 @@ class Client:
                 self._back_off(attempt, None, slow_down=False)
         if text is None:
             raise FetchError(f"request failed for {url}: {last}") from last
+        if disk:
+            try:
+                os.makedirs(self.cache_dir, exist_ok=True)
+                with gzip.open(disk, "wt", encoding="utf-8") as fh:
+                    fh.write(text)
+            except OSError:
+                pass
         if self.debug_dir:
             os.makedirs(self.debug_dir, exist_ok=True)
             name = re.sub(r"[^A-Za-z0-9]+", "_", url.split("?", 1)[-1])[:80]
