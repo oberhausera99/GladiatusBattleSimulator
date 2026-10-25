@@ -93,6 +93,7 @@ def fetch_guild_side(name: str, server: str, client: Optional[Client] = None, pr
                 f = fetch_arena_fighter_by_id(client, m.pid, country, srv, name=m.name)
                 if not f.level and m.level:
                     f.level = m.level
+                f.pid = m.pid
                 return f
             except Exception as e:                  # noqa: BLE001 - reported per member
                 last = e
@@ -112,7 +113,9 @@ def fetch_guild_side(name: str, server: str, client: Optional[Client] = None, pr
     fighters = [f for f in loaded if f is not None]
     failed = [f"{m.name}: {reasons.get(m.pid, '?')}" for m, f in zip(members, loaded) if f is None]
     suspicious = [f"{f.name} (L{f.level}, élet {f.life:.0f}, sebzés {f.damage[0]:.0f}-{f.damage[1]:.0f})"
-                  for f in fighters if f.life <= 0 or f.damage[1] <= 0 or f.skill <= 0 or f.level <= 0]
+                  for f in fighters
+                  if f.life <= 0 or f.damage[1] <= 0 or f.skill <= 0 or f.level <= 0
+                  or f.life < 100 * f.level or f.damage[1] < 1.03 * f.damage[0]]
     if not fighters:
         raise FetchError(f"{gname}: egyik tag adatlapját sem sikerült beolvasni "
                          f"({failed[0] if failed else 'nincs tag'})")

@@ -439,7 +439,7 @@ def fetch_guild_info(client: Client, country: str, server: str, gid: str):
             country, server, f"mod=guild&submod=forumGladiatorius&i={gid}&sh={EMPTY_SH}"))
     except FetchError:
         return None, 0
-    m = re.search(r"<td[^>]*>\s*(?:N[eé]v|Name)\s*</td>\s*<td[^>]*>\s*([^<]+?)\s*</td>", html)
+    m = re.search(r"<t[dh][^>]*>\s*(?:N[eé]v|Name)\s*:?\s*</t[dh]>(?:\s*<[^>]+>)*?\s*([^<\s][^<]*?)\s*<", html)
     return (htmllib.unescape(m.group(1)) if m else None), parse_member_total(html)
 
 
