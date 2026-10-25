@@ -75,3 +75,15 @@ def test_discovery_falls_back_to_probing(monkeypatch):
         def url(self, c, s, q): return f"u{s}"
         def request(self, u): return "<html>highscore mod=player</html>"
     assert bp.discover_servers(C(), "en", max_number=8) == ["3", "5"]
+
+
+def test_tournament_turma_mode():
+    def team(k):
+        main = mk(f"m{k}", 500 + 60 * k)
+        main.is_main, main.role = True, "tank"
+        merc = mk(f"s{k}", 500 + 60 * k)
+        merc.role = "dps"
+        return [main, merc]
+    teams = [team(k) for k in range(5)]
+    top = tournament(teams, samples=4, finalists=4, final_samples=20, seed=1, top=2, mode="turma")
+    assert top[0].team[0].name == "m4" and top[0].fighter is top[0].team[0]

@@ -364,6 +364,11 @@ def fetch_arena_fighter(client: Client, name: str, country: str, server: str) ->
 def fetch_turma_team(client: Client, name: str, country: str, server: str,
                      keep_idle: bool = False) -> List[Fighter]:
     pid, real_name = search_player(client, country, server, name)
+    return fetch_turma_team_by_id(client, pid, country, server, f"{real_name}@s{server}-{country}", keep_idle)
+
+
+def fetch_turma_team_by_id(client: Client, pid: str, country: str, server: str, label: str,
+                           keep_idle: bool = False) -> List[Fighter]:
     team: List[Fighter] = []
     roles = None
     for slot, doll in enumerate(range(2, 7)):
@@ -375,8 +380,8 @@ def fetch_turma_team(client: Client, name: str, country: str, server: str,
         if roles[slot] == "out" and not keep_idle:
             continue
         raw = parse_character_page(html)
-        label = f"{real_name}@s{server}-{country}" if slot == 0 else f"{raw.name} #{slot}"
-        team.append(to_fighter(raw, role=roles[slot], is_main=(slot == 0), name=label))
+        name = label if slot == 0 else f"{raw.name} #{slot}"
+        team.append(to_fighter(raw, role=roles[slot], is_main=(slot == 0), name=name))
     if not team:
         raise FetchError("the turma team is empty")
     return team

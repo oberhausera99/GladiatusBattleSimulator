@@ -16,8 +16,10 @@ from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from .arena import arena_battle
-from .fetch import (Client, FetchError, _backup_mode, fetch_arena_fighter_by_id)
+from .fetch import (Client, FetchError, _backup_mode, fetch_arena_fighter_by_id,
+                    fetch_turma_team_by_id)
 from .fighter import Fighter
+from .turma import turma_battle
 
 LEVEL_WORDS = re.compile(r"szint|level|stufe|nivel|niveau|livello|poziom|n[ií]vel|seviye|уров|lvl", re.I)
 
@@ -262,37 +264,69 @@ def load_fighters(client: Client, cands: Sequence[Candidate], progress: Optional
     return [f for f in loaded if f is not None], failed
 
 
+def load_teams(client: Client, cands: Sequence[Candidate], progress: Optional[Callable] = None,
+               workers: int = 8) -> Tuple[List[List[Fighter]], List[str]]:
+    """Turma teams (main character + mercenaries with their roles) of the candidates."""
+    done = [0]
+    failed: List[str] = []
+
+    def one(c):
+        try:
+            team = fetch_turma_team_by_id(client, c.pid, c.country, c.server, c.label)
+            team[0].level = team[0].level or c.level
+            return team
+        except Exception as e:                       # noqa: BLE001
+            failed.append(f"{c.label}: {type(e).__name__}")
+            return None
+        finally:
+            done[0] += 1
+            if progress:
+                progress(f"Csapatok letöltése: {done[0]}/{len(cands)}")
+
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        loaded = list(ex.map(one, cands))
+    return [t for t in loaded if t], failed
+
+
 # ------------------------------------------------------------------ tournament
 @dataclass
 class Ranking:
-    fighter: Fighter
+    fighter: Fighter          # the main character (in turma mode the team's first member)
     stage1: float            # win rate against random opponents (%)
     final: float             # win rate in the final round robin (%), -1 if not a finalist
     battles: int
+    team: Optional[List[Fighter]] = None
 
 
-def _duel(a: Fighter, b: Fighter, rng: random.Random, n: int, life_mode: str) -> float:
-    """Wins of a against b over n battles (half as attacker, half as defender); draw = 0.5."""
+def _duel(a, b, rng: random.Random, n: int, life_mode: str, mode: str = "arena") -> float:
+    """Wins of a against b over n battles (half as attacker, half as defender); draw = 0.5.
+    In ``turma`` mode a and b are teams (lists of fighters)."""
+    if mode == "turma":
+        fight = lambda x, y: {0: 1, 1: -1, -1: 0}[turma_battle(x, y, rng).winner]
+    else:
+        fight = lambda x, y: arena_battle(x, y, rng, life_mode).result
     w = 0.0
     for k in range(n):
         if k % 2 == 0:
-            r = arena_battle(a, b, rng, life_mode).result
+            r = fight(a, b)
             w += 1 if r == 1 else 0.5 if r == 0 else 0
         else:
-            r = arena_battle(b, a, rng, life_mode).result
+            r = fight(b, a)
             w += 1 if r == -1 else 0.5 if r == 0 else 0
     return w
 
 
-def tournament(fighters: Sequence[Fighter], samples: int = 2, finalists: int = 16,
+def tournament(fighters: Sequence, samples: int = 2, finalists: int = 16,
                final_samples: int = 100, seed: Optional[int] = None, life_mode: str = "full",
-               top: int = 5, battle_budget: int = 4_000_000,
+               top: int = 5, battle_budget: Optional[int] = None, mode: str = "arena",
                progress: Optional[Callable] = None) -> List[Ranking]:
     """Stage 1: everybody fights everybody (``samples`` battles per pair) as long as that fits into
     ``battle_budget`` battles; with more players each fights a random subset of the others.
     Stage 2: the best ``finalists`` fight a round robin (``final_samples`` per pair).
     Returns the best ``top`` players."""
     rng = random.Random(seed)
+    if battle_budget is None:
+        battle_budget = 150_000 if mode == "turma" else 4_000_000
     fs = list(fighters)
     n = len(fs)
     if n < 2:
@@ -316,7 +350,7 @@ def tournament(fighters: Sequence[Fighter], samples: int = 2, finalists: int = 1
         plan = sampled()
     last = -1
     for i, j in plan:
-        w = _duel(fs[i], fs[j], rng, per_pair, life_mode)
+        w = _duel(fs[i], fs[j], rng, per_pair, life_mode, mode)
         wins[i] += w
         wins[j] += per_pair - w
         games[i] += per_pair
@@ -331,7 +365,7 @@ def tournament(fighters: Sequence[Fighter], samples: int = 2, finalists: int = 1
     for x in range(len(order)):
         for y in range(x + 1, len(order)):
             i, j = order[x], order[y]
-            w = _duel(fs[i], fs[j], rng, final_samples, life_mode)
+            w = _duel(fs[i], fs[j], rng, final_samples, life_mode, mode)
             fw[i] += w
             fw[j] += final_samples - w
             fg[i] += final_samples
@@ -339,4 +373,7 @@ def tournament(fighters: Sequence[Fighter], samples: int = 2, finalists: int = 1
         if progress:
             progress(f"Döntő: {x + 1}/{len(order)}")
     ranked = sorted(order, key=lambda i: -fw[i] / fg[i])
-    return [Ranking(fs[i], rate1[i], 100 * fw[i] / fg[i], games[i] + fg[i]) for i in ranked[:top]]
+    def mk(i):
+        team = fs[i] if mode == "turma" else None
+        return Ranking(team[0] if team else fs[i], rate1[i], 100 * fw[i] / fg[i], games[i] + fg[i], team)
+    return [mk(i) for i in ranked[:top]]

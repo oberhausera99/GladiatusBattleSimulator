@@ -60,7 +60,7 @@ azonosítót. A letöltés gyorsítása: gzip tömörítés, 8 párhuzamos szál
 a program magától derítené fel (lobby JSON, ennek hiányában `s1..s300-en` DNS/HTTP próba); a szerverek mező
 üresen hagyva = az összes EN szerver (kézzel is megadható, pl. `1-60`). A Get stats minden szerver
 játékos-toplistáját bejárja (a lapok lapozó linkjeit követi), **korlát nélkül** összegyűjti az intervallumba
-eső összes játékost, és letölti az aréna karakterüket. A Simulate battle mindenkit mindenkivel megütköztet
+eső összes játékost, és letölti az aréna karakterüket. A **Mérés** választóval (Aréna / Turma) dől el, hogy az aréna-karakterek 1v1-ben, vagy a profilban beállított 5 fős turma-csapatok (szerepekkel, 5 letöltés/játékos, kisebb csataszám-kerettel: ~150 ezer csata) mérkőznek. A Simulate battle mindenkit mindenkivel megütköztet
 (csak ha ez a ~4 millió csatás keretet meghaladná, akkor véletlen ellenfelek), a legjobbak körmérkőzést
 játszanak (döntő), és kiírja az 5 legerősebbet. A szerverfelderítést és a toplista markupját a játékon nem
 tudtam ellenőrizni; ha nem talál semmit, a `debug_pages` jelölőnégyzettel mentsd a lapokat.

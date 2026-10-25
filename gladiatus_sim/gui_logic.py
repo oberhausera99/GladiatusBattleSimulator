@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from .arena import simulate_arena
 from .fetch import (Client, FetchError, fetch_arena_fighter, fetch_arena_fighter_by_id,
                     fetch_guild_info, fetch_guild_members, fetch_turma_team, parse_player_spec, search_guild)
-from .bestplayer import (collect_candidates, discover_servers, load_fighters, parse_server_range,
+from .bestplayer import (collect_candidates, discover_servers, load_fighters, load_teams, parse_server_range,
                          tournament)
 from .guild import simulate_guild
 from .fighter import Fighter
@@ -242,10 +242,12 @@ class BestSet:
     level_min: int = 0
     level_max: int = 0
     servers: int = 0
+    mode: str = "arena"
 
 
 def fetch_best_set(level_min: int, level_max: int, servers_text: str = "",
-                   country: str = "en", client: Optional[Client] = None, progress=None) -> BestSet:
+                   country: str = "en", client: Optional[Client] = None, progress=None,
+                   mode: str = "arena") -> BestSet:
     """All players of the level interval from the highscore of every server. With an empty
     ``servers_text`` the servers of the country are discovered dynamically."""
     client = client or Client(cache_dir=cache_dir())
@@ -258,16 +260,20 @@ def fetch_best_set(level_min: int, level_max: int, servers_text: str = "",
     if len(cands) < 2:
         raise FetchError(f"a {level_min}-{level_max} szinttartományban kevesebb mint 2 játékost találtam "
                          f"({len(servers)} szerver, {len(errors)} hibás)")
-    fighters, failed = load_fighters(client, cands, progress)
+    if mode == "turma":
+        fighters, failed = load_teams(client, cands, progress)
+    else:
+        fighters, failed = load_fighters(client, cands, progress)
     if len(fighters) < 2:
         raise FetchError("kevesebb mint 2 játékos adatlapját sikerült beolvasni")
-    return BestSet(fighters, errors, failed, level_min, level_max, len(servers))
+    return BestSet(fighters, errors, failed, level_min, level_max, len(servers), mode)
 
 
 def best_text(b: BestSet, samples: int = 2, seed: Optional[int] = None, progress=None) -> str:
-    top = tournament(b.fighters, samples=samples, seed=seed, progress=progress)
+    top = tournament(b.fighters, samples=samples, seed=seed, progress=progress, mode=b.mode)
+    turma = b.mode == "turma"
     lines = [f"Legjobb játékosok: {b.level_min}-{b.level_max} szint, {b.servers} szerver, {len(b.fighters)} játékos "
-             f"(teljes életerővel, aréna szabályok szerint)", "",
+             f"({'turma szabályok szerint, a profilban beállított zsoldosokkal' if turma else 'teljes életerővel, aréna szabályok szerint'})", "",
              "  #  játékos                       szint  döntő győzelem%  selejtező győzelem%"]
     for i, r in enumerate(top, 1):
         lines.append(f"  {i}  {r.fighter.name[:28]:28s} {r.fighter.level:5d}  {r.final:14.1f}  {r.stage1:18.1f}")

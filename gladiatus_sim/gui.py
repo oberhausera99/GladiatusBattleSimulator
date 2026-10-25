@@ -81,6 +81,10 @@ class App(ttk.Frame):
                                            ("Csata / páros:", "samples", 4))):
             ttk.Label(bf, text=lab).grid(row=0, column=2 * i, padx=(8, 2), sticky="e")
             ttk.Entry(bf, textvariable=self.v_best[key], width=w).grid(row=0, column=2 * i + 1)
+        self.v_best_mode = tk.StringVar(value="arena")
+        ttk.Label(bf, text="Mérés:").grid(row=0, column=8, padx=(12, 2))
+        ttk.Radiobutton(bf, text="Aréna", variable=self.v_best_mode, value="arena").grid(row=0, column=9)
+        ttk.Radiobutton(bf, text="Turma", variable=self.v_best_mode, value="turma").grid(row=0, column=10)
         bf.grid(row=4, column=1, columnspan=6, sticky="w", pady=(6, 0))
         bf.grid_remove()
         self.v_status = tk.StringVar(value="Add meg a két játékost, majd kattints a Get stats gombra.")
@@ -193,13 +197,14 @@ class App(ttk.Frame):
             self.v_status.set(str(e))
             return
         servers = self.v_best["servers"].get()
+        mode = self.v_best_mode.get()
         self._busy(True, "Játékosok keresése a toplistákon...")
 
         def progress(msg):
             self.q.put((lambda r, e, m=msg: self.v_status.set(m), None, None))
 
         def work():
-            b = gl.fetch_best_set(lo, hi, servers, progress=progress)
+            b = gl.fetch_best_set(lo, hi, servers, progress=progress, mode=mode)
             return b, b
 
         self._run_thread(work, lambda r, e: self._got_stats("best", r, e))
